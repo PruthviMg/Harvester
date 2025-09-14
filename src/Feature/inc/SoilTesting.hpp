@@ -13,7 +13,7 @@ namespace Harvestor
 
         void init()
         {
-            if (soilSensorTexture_.loadFromFile("images/soil_sensor_icon.png"))
+            if (soilSensorTexture_.loadFromFile("resources/soil_sensor_icon.png"))
             {
                 soilSensorIcon_.setTexture(soilSensorTexture_);
                 soilSensorIcon_.setPosition(Config::SoilPositionX, Config::SoilPositionY);
@@ -47,11 +47,10 @@ namespace Harvestor
             else if (hovered_)
                 soilSensorIcon_.setColor(Colors::LightHighlight); // Light highlight for hover
             else
-                soilSensorIcon_.setColor(Colors::White); // Normal
+                soilSensorIcon_.setColor(sf::Color::White); // Normal
 
             Game::window_.draw(soilSensorIcon_);
 
-            // Optional: Draw a border if selected
             if (selected_)
             {
                 sf::FloatRect bounds = soilSensorIcon_.getGlobalBounds();
@@ -59,7 +58,7 @@ namespace Harvestor
                 border.setPosition(bounds.left, bounds.top);
                 border.setFillColor(sf::Color::Transparent);
                 border.setOutlineColor(sf::Color::Yellow);
-                border.setOutlineThickness(3.f);
+                border.setOutlineThickness(Config::OutlineThickness);
                 Game::window_.draw(border);
             }
         }

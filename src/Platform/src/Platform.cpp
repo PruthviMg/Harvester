@@ -19,15 +19,19 @@ namespace Harvestor
     {
     }
 
-    const std::vector<std::vector<Grid>> &Platform::getGrids() const
-    {
-        return grids_;
-    }
-
     float Platform::getSoilQualityAt(const int &row, const int &col)
     {
-        return (grids_[row][col]).getQuality();
+        return grids_[row][col].getQuality();
     }
+
+    void Platform::update(const float &dt)
+    {
+        for (auto &row : grids_)
+            for (auto &grid : row)
+                grid.update(dt);
+    }
+
+    Grid &Platform::getGrid(int row, int col) { return grids_[row][col]; }
 
     void Platform::draw(sf::RenderStates states) const
     {

@@ -8,7 +8,6 @@ namespace Harvestor
 {
     namespace Colors
     {
-        const sf::Color White(255, 255, 255);
         const sf::Color Soil(139, 69, 19);         // Brown color for soil
         const sf::Color Water(0, 191, 255);        // Deep sky blue for water
         const sf::Color Crop(34, 139, 34);         // Forest green for crops
@@ -37,7 +36,13 @@ namespace Harvestor
         constexpr auto SoilIconSize = 0.5f;
         constexpr auto PhValuePositionX = WindowWidth - 500;
         constexpr auto PhValuePositionY = WindowHeight - 50;
+        constexpr auto OutlineThickness = 3.0f;
         constexpr auto CharacterSize = 24;
+
+        // Plough
+        constexpr auto PloughPositionX = WindowWidth - 110;
+        constexpr auto PloughPositionY = 150;
+        constexpr auto PloughIconSize = 0.5f;
     }
 }
 

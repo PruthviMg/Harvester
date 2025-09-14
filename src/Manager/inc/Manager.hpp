@@ -4,6 +4,7 @@
 #include "Game.hpp"
 #include "Platform.hpp"
 #include "SoilTesting.hpp"
+#include "Plough.hpp"
 #include <memory>
 
 namespace Harvestor
@@ -24,6 +25,7 @@ namespace Harvestor
     private:
         std::unique_ptr<Platform> platform_;
         SoilTesting soilTesting_;
+        Plough plough_;
     };
 }
 

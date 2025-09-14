@@ -14,11 +14,13 @@ namespace Harvestor
 
         ~Platform();
 
-        const std::vector<std::vector<Grid>> &getGrids() const;
-
         void draw(sf::RenderStates states = sf::RenderStates::Default) const;
 
         float getSoilQualityAt(const int &row, const int &col);
+
+        void update(const float &dt);
+
+        Grid &getGrid(int row, int col);
 
     private:
         std::vector<std::vector<Grid>> grids_;

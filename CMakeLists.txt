@@ -41,6 +41,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     sfml-system
 )
 
-file(COPY src/images/ DESTINATION ${CMAKE_BINARY_DIR}/images)
-file(COPY src/images/DejaVuSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/images)
+file(COPY src/resources/ DESTINATION ${CMAKE_BINARY_DIR}/resources)
+file(COPY src/resources/DejaVuSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)
 
