@@ -20,10 +20,25 @@ struct Crop {
     sf::Vector2f originalSize;
 };
 
+struct Point {
+    float x;
+    float y;
+};
+
+struct CropSimulation {
+    std::string cropName;
+    float x;
+    float y;
+    double timeToMature;
+};
+
 // ---------------- Tile ----------------
 struct Tile {
     sf::Vector2f position;
     float size;
+
+    Crop crop;          // current growth, shape, etc.
+    CropType cropType;  // the type of crop planted
 
     // Soil factors (0..1)
     float soilBaseQuality;  // fertility
@@ -38,7 +53,6 @@ struct Tile {
     float soilQuality;  // final computed
     bool isInsideLand;
 
-    Crop crop;
     bool hasCrop = false;
 
     float timeToMature = -1.f;  // -1 = not matured yet

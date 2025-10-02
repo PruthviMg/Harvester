@@ -8,8 +8,8 @@ int main() {
 
     // Get screen resolution
     sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    float width = desktop.width;
-    float height = desktop.height;
+    float width = (float)desktop.width;
+    float height = (float)desktop.height;
 
     // Config setup
     Config::uiPanelWidth = width * 0.15f;  // 15% for UI
@@ -38,36 +38,37 @@ int main() {
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
+            // Window close
             if (event.type == sf::Event::Closed) window.close();
 
-            if (event.type == sf::Event::MouseButtonPressed) farm.handleClick(sf::Mouse::getPosition(window));
-
-            // Scroll handling for crop dropdown
-            if (event.type == sf::Event::MouseWheelScrolled && farm.cropDropdownActive) {
-                if (event.mouseWheelScroll.delta > 0 && farm.cropScrollOffset > 0) {
-                    farm.cropScrollOffset--;
-                }
-                if (event.mouseWheelScroll.delta < 0 && farm.cropScrollOffset + Config::maxVisibleCrops < farm.cropTypes.size()) {
-                    farm.cropScrollOffset++;
+            // Mouse pressed
+            else if (event.type == sf::Event::MouseButtonPressed) {
+                if (event.mouseButton.button == sf::Mouse::Right) {
+                } else if (event.mouseButton.button == sf::Mouse::Left) {
+                    farm.handleMousePressed(sf::Mouse::getPosition(window));
+                    farm.handleClick(sf::Mouse::getPosition(window));
                 }
             }
 
-            // Scroll handling for layout dropdown
-            if (event.type == sf::Event::MouseWheelScrolled && farm.layoutDropdownActive) {
-                if (event.mouseWheelScroll.delta > 0 && farm.layoutScrollOffset > 0) {
-                    farm.layoutScrollOffset--;
-                }
-                if (event.mouseWheelScroll.delta < 0 && farm.layoutScrollOffset + Config::maxVisibleLayouts < (int)farm.layouts.size()) {
-                    farm.layoutScrollOffset++;
-                }
+            else if (event.type == sf::Event::MouseButtonReleased) {
+                farm.handleMouseReleased(sf::Mouse::getPosition(window));
             }
+
+            else if (event.type == sf::Event::MouseMoved) {
+                farm.handleMouseMoved(sf::Mouse::getPosition(window));
+            }
+
+            // Mouse wheel scroll (dropdowns)
+            else if (event.type == sf::Event::MouseWheelScrolled) {
+                farm.handleMouseWheelScroll(event.mouseWheelScroll.delta);
+            }
+
             // Keyboard events
-            if (event.type == sf::Event::KeyPressed) {
-                if (event.key.code == sf::Keyboard::S) {
-                    farm.writeSimulationOutput("simulation_output.csv");  // Save results
-                }
-                if (event.key.code == sf::Keyboard::Escape) {
-                    window.close();  // Exit
+            else if (event.type == sf::Event::KeyPressed) {
+                if (event.key.code == sf::Keyboard::Escape) window.close();  // Exit
+
+                if (event.key.code == sf::Keyboard::C) {
+                    farm.clearSelection();
                 }
             }
         }
@@ -78,7 +79,7 @@ int main() {
 
         // Render
         window.clear(sf::Color(50, 50, 50));
-        farm.draw();
+        farm.draw();  // Draw farm & UI
         window.display();
     }
 

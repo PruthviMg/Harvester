@@ -1,16 +1,25 @@
 #ifndef LOADER_HPP_
 #define LOADER_HPP_
 
+#include "QualityMatrix.hpp"
 #include "common.hpp"
 #include "land.hpp"
 
 namespace Harvestor {
+#include <algorithm>
+#include <array>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
 class SoilLoader {
    public:
-    // Load soil data from a CSV or simple space-separated file
+    // Load soil data from a CSV or whitespace-separated file
     // Each line = 7 floats: soilBaseQuality sunlight nutrients pH organicMatter compaction salinity
-    static std::vector<std::array<float, 7>> loadFromFile(const std::string &filename) {
-        std::vector<std::array<float, 7>> soilMatrix;
+    static std::vector<std::array<float, 9>> loadFromFile(const std::string &filename) {
+        std::vector<std::array<float, 9>> soilMatrix;
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Failed to open soil file: " << filename << "\n";
@@ -18,17 +27,57 @@ class SoilLoader {
         }
 
         std::string line;
+        bool isHeader = true;
+
         while (std::getline(file, line)) {
-            if (line.empty() || line[0] == '#') continue;  // skip comments
+            // Trim whitespace
+            line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](int ch) { return !std::isspace(ch); }));
+            line.erase(std::find_if(line.rbegin(), line.rend(), [](int ch) { return !std::isspace(ch); }).base(), line.end());
+
+            if (line.empty() || line[0] == '#') continue;
+
+            // Skip header row if present
+            if (isHeader) {
+                isHeader = false;
+                if (line.find_first_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") != std::string::npos) {
+                    continue;  // assume header contains letters
+                }
+            }
+
             std::stringstream ss(line);
-            std::array<float, 7> vals;
-            for (int i = 0; i < 7; ++i) {
-                if (!(ss >> vals[i])) {
-                    std::cerr << "Invalid soil data in line: " << line << "\n";
+            std::string token;
+
+            // First two columns are x, y (skip)
+            // if (!std::getline(ss, token, ',')) continue;  // x
+            // if (!std::getline(ss, token, ',')) continue;  // y
+
+            std::array<float, 9> vals;
+            bool valid = true;
+
+            for (int i = 0; i < 9; ++i) {
+                if (!std::getline(ss, token, ',')) {
+                    valid = false;
+                    break;
+                }
+
+                // Remove potential whitespace
+                token.erase(token.begin(), std::find_if(token.begin(), token.end(), [](int ch) { return !std::isspace(ch); }));
+                token.erase(std::find_if(token.rbegin(), token.rend(), [](int ch) { return !std::isspace(ch); }).base(), token.end());
+
+                try {
+                    vals[i] = std::stof(token);
+                } catch (const std::exception &e) {
+                    std::cerr << "Invalid float in soil data: '" << token << "' in line: " << line << "\n";
+                    valid = false;
                     break;
                 }
             }
-            soilMatrix.push_back(vals);
+
+            if (valid) {
+                soilMatrix.push_back(vals);
+            } else {
+                std::cerr << "Skipping invalid soil line: " << line << "\n";
+            }
         }
 
         return soilMatrix;
@@ -48,36 +97,73 @@ class FarmLoader {
         lands.clear();
         ponds.clear();
 
+        struct TempLandData {
+            float cx, cy, r;
+        };
+        std::vector<TempLandData> tempLands;
+
         std::string type;
         while (file >> type) {
             if (type[0] == '#') {
                 std::getline(file, type);
                 continue;
             }
+
             if (type == "Land") {
                 float cx, cy, r;
                 file >> cx >> cy >> r;
-
-                Land land(cx, cy, r, Config::landTileSize);
-
-                // Optionally, fetch soil values from soil loader here
-                std::vector<std::array<float, 7>> soilMatrix = SoilLoader::loadFromFile(Config::soilDataFile);
-
-                // Generate tiles using the updated Land class
-                land.generateTiles(soilMatrix);
-
-                // Plant crops on this land
-                if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
-                    land.plantCrops(crops[selectedCropIndex]);
-                }
-
-                lands.push_back(land);
+                tempLands.push_back({cx, cy, r});
             } else if (type == "Pond") {
                 float cx, cy, r;
                 file >> cx >> cy >> r;
                 ponds.emplace_back(cx, cy, r, 0.9f, 0.9f);
             }
         }
+
+        // ---------------- Generate combined soil matrix ----------------
+        std::vector<Tile> allTiles;
+
+        for (auto &l : tempLands) {
+            QualityMatrix matrix(l.cx, l.cy, l.r, Config::landTileSize);
+            auto tiles = matrix.generateTiles();
+
+            Land land(l.cx, l.cy, l.r, Config::landTileSize);
+            land.generateTiles(tiles);
+
+            if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
+                land.plantCrops(crops[selectedCropIndex]);
+            }
+
+            lands.push_back(land);
+
+            allTiles.insert(allTiles.end(), tiles.begin(), tiles.end());
+        }
+
+        // Save the combined soil data to CSV
+        std::ofstream soilFile(Config::soilDataFile);
+        if (!soilFile.is_open()) {
+            std::cerr << "Error: Could not open soil_data.csv for writing\n";
+        } else {
+            soilFile << "x,y,soilBaseQuality,sunlight,nutrients,pH,organicMatter,compaction,salinity\n";
+            for (auto &tile : allTiles) {
+                soilFile << tile.position.x << "," << tile.position.y << "," << tile.soilBaseQuality << "," << tile.sunlight << "," << tile.nutrients
+                         << "," << tile.pH << "," << tile.organicMatter << "," << tile.compaction << "," << tile.salinity << "\n";
+            }
+        }
+
+        // // ---------------- Create Land objects with soil data ----------------
+        // std::vector<std::array<float, 9>> soilMatrix = SoilLoader::loadFromFile(Config::soilDataFile);
+
+        // for (auto &l : tempLands) {
+        //     Land land(l.cx, l.cy, l.r, Config::landTileSize);
+        //     land.generateTiles(soilMatrix);
+
+        //     if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
+        //         land.plantCrops(crops[selectedCropIndex]);
+        //     }
+
+        //     lands.push_back(land);
+        // }
     }
 };
 

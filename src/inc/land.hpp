@@ -18,62 +18,65 @@ class Land {
         shape.setFillColor(sf::Color(139, 69, 19));
     }
 
-    void generateTiles(const std::vector<std::array<float, 7>> &soilMatrix = {}) {
-        tiles.clear();
-        int soilIndex = 0;
-
-        float minX = center.x - radius;
-        float maxX = center.x + radius;
-        float minY = center.y - radius;
-        float maxY = center.y + radius;
-
-        for (float y = minY; y < maxY; y += tileSize) {
-            for (float x = minX; x < maxX; x += tileSize) {
-                sf::Vector2f tileCenter(x + tileSize / 2.f, y + tileSize / 2.f);
-                if (!Utility::pointInPolygon(shape, tileCenter)) continue;
-
-                Tile t;
-                t.position = sf::Vector2f(x, y);
-                t.size = tileSize;
-                t.isInsideLand = true;
-                t.hasCrop = false;
-
-                if (!soilMatrix.empty()) {
-                    const auto &vals = soilMatrix[soilIndex % soilMatrix.size()];  // repeat if needed
-                    t.soilBaseQuality = vals[0];
-                    t.sunlight = vals[1];
-                    t.nutrients = vals[2];
-                    t.pH = vals[3];
-                    t.organicMatter = vals[4];
-                    t.compaction = vals[5];
-                    t.salinity = vals[6];
-                    soilIndex++;
-                } else {
-                    std::cout << "soilMatrix is not available" << std::endl;
-                }
-
-                t.waterLevel = 0.f;
-                tiles.push_back(t);
-            }
+    void generateTiles(std::vector<Tile> ts) {
+        for (auto &t : ts) {
+            t.size = Config::landTileSize;
+            t.isInsideLand = true;
+            t.hasCrop = false;
+            t.waterLevel = 0.f;
+            tiles.push_back(t);
         }
+    }
+
+    void generateTiles(const std::vector<std::array<float, 9>> &soilMatrix = {}) {
+        tiles.clear();
+
+        if (soilMatrix.empty()) {
+            std::cerr << "Soil matrix is empty! Cannot generate tiles.\n";
+            return;
+        }
+
+        for (const auto &vals : soilMatrix) {
+            // vals = {soilBaseQuality, sunlight, nutrients, pH, organicMatter, compaction, salinity}
+            // We'll also read x,y from the file for tile position if needed
+
+            Tile t;
+            // If you stored x,y in the CSV as the first two columns:
+            t.position = sf::Vector2f(vals[0], vals[1]);  // <-- adjust if x,y are separate
+            t.size = Config::landTileSize;
+            t.isInsideLand = true;
+            t.hasCrop = false;
+
+            // Soil attributes from CSV
+            t.soilBaseQuality = vals[2];
+            t.sunlight = vals[3];
+            t.nutrients = vals[4];
+            t.pH = vals[5];
+            t.organicMatter = vals[6];
+            t.compaction = vals[7];
+            t.salinity = vals[8];
+
+            t.waterLevel = 0.f;
+
+            tiles.push_back(t);
+        }
+
+        std::cout << "Generated " << tiles.size() << " tiles directly from soil matrix.\n";
     }
 
     float computeSoilQuality(const Tile &tile, const CropType &crop) {
         float waterFactor = 1.f - std::abs(tile.waterLevel - crop.optimalWater) / crop.tolerance;
         waterFactor = std::clamp(waterFactor, 0.f, 1.f);
 
-        // Weighted sum of factors
         float quality = 0.f;
         quality += 0.25f * tile.soilBaseQuality;
         quality += 0.15f * tile.sunlight;
         quality += 0.15f * tile.nutrients;
         quality += 0.1f * tile.pH;
         quality += 0.15f * tile.organicMatter;
-        quality += 0.1f * (1.f - tile.compaction);  // lower compaction = better
-        quality += 0.1f * (1.f - tile.salinity);    // lower salinity = better
-
-        // Include water factor
-        quality += 0.5f * waterFactor;
+        quality += 0.1f * (1.f - tile.compaction);
+        quality += 0.1f * (1.f - tile.salinity);
+        quality += 0.1f * waterFactor;  // water now included in weighted sum
 
         return std::clamp(quality, 0.f, 1.f);
     }
@@ -104,28 +107,25 @@ class Land {
 
     void plantCrops(const CropType &cropType) {
         for (auto &tile : tiles) {
-            float soilFactor = tile.soilBaseQuality;
             tile.hasCrop = true;
+            tile.cropType = cropType;  // <--- assign the crop type
             tile.crop.growth = 0.f;
-
             tile.crop.originalSize = sf::Vector2f(tile.size, tile.size);
 
             sf::Vector2f initialSize = tile.crop.originalSize * Config::cropInitialScale;
             tile.crop.shape.setSize(initialSize);
-
             tile.crop.shape.setPosition(tile.position.x + (tile.size - initialSize.x) / 2, tile.position.y + (tile.size - initialSize.y) / 2);
-
             tile.crop.shape.setFillColor(cropType.baseColor);
 
             // INITIAL WATER: set close to crop optimal
             tile.waterLevel = cropType.optimalWater;
 
-            // Compute soil quality initially
+            // Compute initial soil quality
             tile.soilQuality = computeSoilQuality(tile, cropType);
         }
     }
 
-    void updateGrowth(float dt, const std::vector<Pond> &ponds, const CropType &cropType, bool simulate, bool raining, float simTime) {
+    void updateGrowth(float dt, const std::vector<Pond> &ponds, bool simulate, bool raining, float simTime) {
         if (!simulate) return;
 
         static std::mt19937 rng(12345);                          // fixed seed for reproducibility
@@ -133,6 +133,8 @@ class Land {
 
         for (auto &tile : tiles) {
             if (!tile.hasCrop) continue;
+
+            const CropType &cropType = tile.cropType;  // Use the actual crop planted in this tile
 
             // ---------------- Rain ----------------
             if (raining) {

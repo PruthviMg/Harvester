@@ -3,8 +3,10 @@
 
 #include <SFML/Graphics.hpp>
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +15,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Harvestor {
@@ -34,7 +37,7 @@ struct Config {
     static inline float cropButtonSpacing = 5.f;
     static inline float bigButtonHeightMultiplier = 3.f;  // big buttons (simulate/reset/rain)
     static inline float uiPadding = 10.f;
-    static inline float ButtonPadding = 500.f;
+    static inline float ButtonPadding = 300.f;
 
     static inline unsigned int cropFontSize = 16;
     static inline unsigned int bigButtonFontSize = 18;
@@ -55,7 +58,7 @@ struct Config {
     static inline std::string fontPath = "resources/DejaVuSans.ttf";
     static inline std::string layoutFile = "input/farm_layout.txt";
     static inline std::string cropsFile = "input/crops.txt";
-    static inline std::string soilDataFile = "input/soil_data.txt";
+    static inline std::string soilDataFile = "soil_data.csv";
 
     // crops
     static inline int maxVisibleCrops = 4;
@@ -65,6 +68,8 @@ struct Config {
     static inline int numRaindrops = 2000;
 
     static inline std::mt19937 rng{12345};
+
+    static inline bool tilesGenerated = false;
 };
 }  // namespace Harvestor
 
