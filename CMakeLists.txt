@@ -10,7 +10,7 @@ find_package(SFML 2.5 REQUIRED COMPONENTS graphics window system)
 
 # Collect source files (only from src, not CMake files)
 file(GLOB_RECURSE SOURCE_FILES
-    src/*.cpp
+    src/src/*.cpp
 )
 
 # Collect headers (optional, for IDEs)
@@ -27,11 +27,7 @@ add_executable(${PROJECT_NAME}
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
-    src/Common/inc
-    src/Platform/inc
-    src/Manager/inc
-    src/Configurator/inc
-    src/Feature/inc
+    src/inc/
 )
 
 # Link SFML
@@ -41,6 +37,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     sfml-system
 )
 
-file(COPY src/resources/ DESTINATION ${CMAKE_BINARY_DIR}/resources)
-file(COPY src/resources/DejaVuSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)
-
+file(COPY input/ DESTINATION ${CMAKE_BINARY_DIR}/input/)
+file(COPY resources/grass.png DESTINATION ${CMAKE_BINARY_DIR}/textures)
+file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/resources)
+file(COPY resources/DejaVuSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)

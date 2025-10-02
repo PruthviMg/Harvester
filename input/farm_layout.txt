@@ -1,0 +1,9 @@
+# Lands: cx cy radius
+LAND 550 200 100
+LAND 700 300 140
+LAND 900 400 120
+
+# Ponds: cx cy radius
+POND 400 500 60
+POND 700 450 80
+POND 1000 400 70
