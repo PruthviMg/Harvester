@@ -50,7 +50,11 @@ class FarmLoader {
 
         std::string type;
         while (file >> type) {
-            if (type == "LAND") {
+            if (type[0] == '#') {
+                std::getline(file, type);
+                continue;
+            }
+            if (type == "Land") {
                 float cx, cy, r;
                 file >> cx >> cy >> r;
 
@@ -68,7 +72,7 @@ class FarmLoader {
                 }
 
                 lands.push_back(land);
-            } else if (type == "POND") {
+            } else if (type == "Pond") {
                 float cx, cy, r;
                 file >> cx >> cy >> r;
                 ponds.emplace_back(cx, cy, r, 0.9f, 0.9f);

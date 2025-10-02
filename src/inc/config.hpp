@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -58,6 +59,7 @@ struct Config {
 
     // crops
     static inline int maxVisibleCrops = 4;
+    static inline int maxVisibleLayouts = 4;
 
     // Raindrops
     static inline int numRaindrops = 2000;
