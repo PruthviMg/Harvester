@@ -13,17 +13,31 @@ struct QualityMatrix {
 
     std::vector<Tile> generateTiles() {
         tiles.clear();
-        int samplesPerTile = 1;  // for simplicity
+
+        auto insideCircle = [&](float px, float py) {
+            float dx = px - cx;
+            float dy = py - cy;
+            return (dx * dx + dy * dy) <= radius * radius;
+        };
+
         float startX = cx - radius;
         float startY = cy - radius;
+
         for (float y = startY; y <= cy + radius; y += tileSize) {
             for (float x = startX; x <= cx + radius; x += tileSize) {
-                float dx = x - cx;
-                float dy = y - cy;
-                if (std::sqrt(dx * dx + dy * dy) > radius) continue;  // inside circle only
+                // Check all 4 corners of the tile
+                if (!(insideCircle(x, y) && insideCircle(x + tileSize, y) && insideCircle(x, y + tileSize) &&
+                      insideCircle(x + tileSize, y + tileSize))) {
+                    continue;  // skip if any corner is outside land circle
+                }
+
                 Tile t;
-                t.position.x = x;
-                t.position.y = y;
+                t.position = {x, y};
+                t.size = tileSize;
+                t.isInsideLand = true;
+                t.hasCrop = false;
+
+                // Random soil factors for diversity
                 t.soilBaseQuality = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
                 t.sunlight = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
                 t.nutrients = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
@@ -31,9 +45,11 @@ struct QualityMatrix {
                 t.organicMatter = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
                 t.compaction = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
                 t.salinity = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
+
                 tiles.push_back(t);
             }
         }
+
         return tiles;
     }
 };

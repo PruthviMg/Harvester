@@ -1,0 +1,9 @@
+# Land format: x y radius
+Land 450 600 170
+Land 900 400 200
+Land 1250 850 240
+
+# Pond format: x y radius
+Pond 500 550 70
+Pond 920 450 90
+Pond 1200 820 110

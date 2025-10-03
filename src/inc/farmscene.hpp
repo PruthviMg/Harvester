@@ -76,7 +76,7 @@ class FarmScene {
 
         for (const auto &entry : std::filesystem::directory_iterator(layoutsPath)) {
             if (entry.is_regular_file() && entry.path().extension() == ".txt") {
-                layouts.push_back(entry.path().filename().string());  // just filename
+                layouts.push_back(removeExtension(entry.path().filename().string()));  // just filename
                 std::cout << "Found layout: " << entry.path().filename().string() << "\n";
             }
         }
@@ -248,6 +248,14 @@ class FarmScene {
             if (delta > 0 && layoutScrollOffset > 0) layoutScrollOffset--;
             if (delta < 0 && layoutScrollOffset + Config::maxVisibleCrops < (int)layouts.size()) layoutScrollOffset++;
         }
+    }
+
+    std::string removeExtension(const std::string &filename) {
+        size_t dotPos = filename.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            return filename.substr(0, dotPos);
+        }
+        return filename;  // no dot found
     }
 
     // Generic dropdown drawer
@@ -488,7 +496,7 @@ class FarmScene {
             if (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) {
                 std::string layoutPath = getLayoutFullPath(selectedLayoutIndex);
                 std::cout << "Loading layout: " << layoutPath << "\n";
-                generateFromFile(layoutPath);
+                generateFromFile(layoutPath + ".txt");
             }
             return;
         }
@@ -702,6 +710,7 @@ class FarmScene {
     }
 
     void clearSelection() {
+        selectAreaActive = false;
         selectionState = SelectionState::None;              // Reset state
         showAnalysisPopup = false;                          // Hide popup
         selectionRect.setSize(sf::Vector2f(0.f, 0.f));      // Clear rectangle
@@ -728,8 +737,8 @@ class FarmScene {
                 if (!tile.hasCrop) continue;
                 float maturity = (tile.timeToMature >= 0.f) ? tile.timeToMature : simClock.getElapsedTime().asSeconds();
                 if (tile.crop.growth >= 1.f) {
-                    out << landIdx << "," << tile.position.x << "," << tile.position.y << "," << cropTypes[selectedCropIndex].name << ","
-                        << std::fixed << std::setprecision(2) << tile.crop.growth << "," << maturity << "," << tile.soilQuality << "\n";
+                    out << landIdx << "," << tile.position.x << "," << tile.position.y << "," << tile.cropType.name << "," << std::fixed
+                        << std::setprecision(2) << tile.crop.growth << "," << maturity << "," << tile.soilQuality << "\n";
                 }
             }
         }
