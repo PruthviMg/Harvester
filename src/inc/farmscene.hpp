@@ -5,7 +5,8 @@
 #include "evaluator.hpp"
 #include "grassManager.hpp"
 #include "loader.hpp"
-
+#include <curl/curl.h>
+#include <nlohmann/json.hpp>
 namespace Harvestor {
 // ---------------- FarmScene ----------------
 class FarmScene {
@@ -398,6 +399,7 @@ class FarmScene {
         drawButton(btnX, btnY, "Plant Crops", sf::Color(100, 200, 100), font, Config::cropButtonWidth, bigButtonHeight);
 
         drawButton(btnX, btnY, "Clear Results", sf::Color(255, 0, 0), font, Config::cropButtonWidth, bigButtonHeight);
+        drawButton(btnX, btnY, "Analyse", sf::Color(255, 0, 0), font, Config::cropButtonWidth, bigButtonHeight);
     }
 
     // Generic dropdown click handler
@@ -491,6 +493,8 @@ class FarmScene {
                                    bigButtonHeight);
         sf::FloatRect clearResultsBtnRect(Config::uiPadding, startY + 7 * bigButtonHeight + 7 * Config::cropButtonSpacing, Config::cropButtonWidth,
                                           bigButtonHeight);
+        sf::FloatRect analyseBtnRect(Config::uiPadding, startY + 8 * bigButtonHeight + 8 * Config::cropButtonSpacing, Config::cropButtonWidth,
+        bigButtonHeight);
 
         if (loadLayoutBtnRect.contains(mousePos.x, mousePos.y)) {
             if (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) {
@@ -532,6 +536,10 @@ class FarmScene {
 
         if (clearResultsBtnRect.contains(mousePos.x, mousePos.y)) {
             clearSimulationResults();
+            return;
+        }
+        if (analyseBtnRect.contains(mousePos.x, mousePos.y)) {
+            analyzeSelectedArea();
             return;
         }
     }
@@ -589,7 +597,9 @@ class FarmScene {
                     tile.soilQuality = land.computeSoilQuality(tile, chosenCrop);
 
                     plantedCount++;
-                }
+                } else {
+                    // Outside selection, clear crop
+                    tile.hasCrop = false;}
             }
         }
 
@@ -641,7 +651,7 @@ class FarmScene {
             showAnalysisPopup = true;
 
             // TODO: perform analysis on selected region here
-            analyzeSelectedArea();
+            // analyzeSelectedArea();
         }
     }
 
