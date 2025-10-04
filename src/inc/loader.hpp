@@ -150,20 +150,6 @@ class FarmLoader {
                          << "," << tile.pH << "," << tile.organicMatter << "," << tile.compaction << "," << tile.salinity << "\n";
             }
         }
-
-        // // ---------------- Create Land objects with soil data ----------------
-        // std::vector<std::array<float, 9>> soilMatrix = SoilLoader::loadFromFile(Config::soilDataFile);
-
-        // for (auto &l : tempLands) {
-        //     Land land(l.cx, l.cy, l.r, Config::landTileSize);
-        //     land.generateTiles(soilMatrix);
-
-        //     if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
-        //         land.plantCrops(crops[selectedCropIndex]);
-        //     }
-
-        //     lands.push_back(land);
-        // }
     }
 };
 

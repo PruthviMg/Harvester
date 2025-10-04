@@ -116,14 +116,36 @@ struct RainDrop {
 // ---------------- BlobGenerator ----------------
 class BlobGenerator {
    public:
-    static sf::ConvexShape generate(float cx, float cy, float radius, int points = 25, float irregularity = 0.25f) {
-        sf::ConvexShape shape;
-        shape.setPointCount(points);
+    static sf::ConvexShape generate(float cx, float cy, float radius, int points = 40, float irregularity = 0.15f) {
+        std::vector<sf::Vector2f> rawPoints;
+
+        // Step 1: Generate noisy circle points
         for (int i = 0; i < points; i++) {
             float angle = i * 2 * M_PI / points;
             float r = radius * (1.f - irregularity / 2.f + static_cast<float>(rand()) / RAND_MAX * irregularity);
-            shape.setPoint(i, sf::Vector2f(cx + r * cos(angle), cy + r * sin(angle)));
+            rawPoints.emplace_back(cx + r * cos(angle), cy + r * sin(angle));
         }
+
+        // Step 2: Smooth with midpoint interpolation
+        std::vector<sf::Vector2f> smoothPoints;
+        for (int i = 0; i < points; i++) {
+            sf::Vector2f p1 = rawPoints[i];
+            sf::Vector2f p2 = rawPoints[(i + 1) % points];
+
+            // Keep the actual point
+            smoothPoints.push_back(p1);
+
+            // Add midpoint between this and next for rounded edges
+            smoothPoints.push_back(sf::Vector2f((p1.x + p2.x) / 2.f, (p1.y + p2.y) / 2.f));
+        }
+
+        // Step 3: Build convex shape with smoothed points
+        sf::ConvexShape shape;
+        shape.setPointCount(smoothPoints.size());
+        for (size_t i = 0; i < smoothPoints.size(); i++) {
+            shape.setPoint(i, smoothPoints[i]);
+        }
+
         return shape;
     }
 };
@@ -154,7 +176,26 @@ class Pond {
 
     Pond(float cx, float cy, float r, float q = 1.f, float qty = 1.f) : center(cx, cy), radius(r), quality(q), quantity(qty) {
         shape = BlobGenerator::generate(cx, cy, r, 25, 0.25f);
-        shape.setFillColor(sf::Color(0, 150, 255));
+
+        // Load land texture
+        static sf::Texture waterTexture;
+        static bool loaded = false;
+        if (!loaded) {
+            if (!waterTexture.loadFromFile("resources/water.png")) {
+                std::cerr << "Failed to load water texture!" << std::endl;
+            } else {
+                waterTexture.setRepeated(true);
+                waterTexture.setSmooth(true);
+                loaded = true;
+            }
+        }
+
+        // Apply texture to shape
+        shape.setTexture(&waterTexture);
+
+        // Adjust texture rect (so it tiles nicely across the land shape)
+        shape.setTextureRect(sf::IntRect(0, 0, static_cast<int>(2 * radius), static_cast<int>(2 * radius)));
+        // shape.setFillColor(sf::Color(0, 150, 255));
     }
 
     void draw(sf::RenderWindow &window) { window.draw(shape); }

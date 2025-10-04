@@ -1,12 +1,14 @@
 #ifndef FARM_SCENE_HPP_
 #define FARM_SCENE_HPP_
 
+#include <curl/curl.h>
+
+#include <nlohmann/json.hpp>
+
 #include "common.hpp"
 #include "evaluator.hpp"
 #include "grassManager.hpp"
 #include "loader.hpp"
-#include <curl/curl.h>
-#include <nlohmann/json.hpp>
 namespace Harvestor {
 // ---------------- FarmScene ----------------
 class FarmScene {
@@ -494,7 +496,7 @@ class FarmScene {
         sf::FloatRect clearResultsBtnRect(Config::uiPadding, startY + 7 * bigButtonHeight + 7 * Config::cropButtonSpacing, Config::cropButtonWidth,
                                           bigButtonHeight);
         sf::FloatRect analyseBtnRect(Config::uiPadding, startY + 8 * bigButtonHeight + 8 * Config::cropButtonSpacing, Config::cropButtonWidth,
-        bigButtonHeight);
+                                     bigButtonHeight);
 
         if (loadLayoutBtnRect.contains(mousePos.x, mousePos.y)) {
             if (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) {
@@ -599,7 +601,8 @@ class FarmScene {
                     plantedCount++;
                 } else {
                     // Outside selection, clear crop
-                    tile.hasCrop = false;}
+                    tile.hasCrop = false;
+                }
             }
         }
 

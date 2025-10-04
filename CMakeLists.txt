@@ -53,6 +53,4 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # ------------------------
 file(COPY input/ DESTINATION ${CMAKE_BINARY_DIR}/input/)
 file(COPY layouts/ DESTINATION ${CMAKE_BINARY_DIR}/layouts/)
-file(COPY resources/grass.png DESTINATION ${CMAKE_BINARY_DIR}/textures)
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/resources)
-file(COPY resources/DejaVuSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)

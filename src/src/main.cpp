@@ -21,15 +21,8 @@ int main() {
     sf::RenderWindow window(sf::VideoMode((unsigned)width, (unsigned)height), "Farm Simulation");
     window.setFramerateLimit(60);
 
-    // Load grass texture
-    sf::Texture grassTexture;
-    if (!grassTexture.loadFromFile("textures/grass.png")) {
-        std::cerr << "Failed to load textures/grass.png\n";
-        return -1;
-    }
-
     // Initialize managers
-    GrassManager grassManager(grassTexture, Config::grassTileSize);
+    GrassManager grassManager("resources/combined.png", Config::grassTileSize);
     FarmScene farm(window, grassManager, width, height);
 
     // Clock for delta time

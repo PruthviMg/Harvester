@@ -15,7 +15,38 @@ class Land {
 
     Land(float cx, float cy, float r, float tileSize = Config::landTileSize) : center(cx, cy), radius(r), tileSize(tileSize) {
         shape = BlobGenerator::generate(cx, cy, r, 25, 0.25f);
-        shape.setFillColor(sf::Color(139, 69, 19));
+
+        // --- Load farmland texture ---
+        static sf::Texture farmlandTexture;
+        static bool loaded = false;
+        if (!loaded) {
+            sf::Image img;
+            if (!img.loadFromFile("resources/combined.png")) {
+                std::cerr << "Failed to load farmland texture!" << std::endl;
+            } else {
+                // Crop center 5x5 area
+                sf::Vector2u size = img.getSize();
+                unsigned int cropSize = 5 * tileSize;  // 5x5 tiles in pixels
+                unsigned int x = (size.x - cropSize) / 2;
+                unsigned int y = (size.y - cropSize) / 2;
+
+                sf::IntRect centerRect(x, y, cropSize, cropSize);
+                sf::Image cropped;
+                cropped.create(cropSize, cropSize, sf::Color::Transparent);
+                cropped.copy(img, 0, 0, centerRect, true);
+
+                farmlandTexture.loadFromImage(cropped);
+                farmlandTexture.setRepeated(true);
+                farmlandTexture.setSmooth(true);
+                loaded = true;
+            }
+        }
+
+        // Apply cropped texture
+        shape.setTexture(&farmlandTexture);
+
+        // Tile across the blob
+        shape.setTextureRect(sf::IntRect(0, 0, static_cast<int>(2 * radius), static_cast<int>(2 * radius)));
     }
 
     void generateTiles(std::vector<Tile> ts) {
