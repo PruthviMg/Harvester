@@ -171,7 +171,7 @@ class Evaluator {
     }
 
     // Load tile/soil data
-    bool updateSoilData(const std::string& filename = "land.csv") {
+    bool updateSoilData(const std::string& filename = "input/land.csv") {
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Could not open file: " << filename << ": " << strerror(errno) << "\n";
@@ -296,12 +296,10 @@ class Evaluator {
             }
         }
 
-        std::string analysis = analyzeCSVWithLLM("land.csv", "simulation_output.csv", KEY);
+        std::string analysis = analyzeCSVWithLLM("input/land.csv", "simulation_output.csv", KEY);
         dumpLLMReport("harvestor_report.html", analysis, bestCrop);
 
         fs::path absolutePath = fs::absolute("/harvestor_report.html");
-        auto command = std::string("start ") + absolutePath.string();
-        system(command.c_str());
 
         return "Best crop for area: " + bestCrop + " Report : " + absolutePath.string();
     }

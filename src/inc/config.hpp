@@ -26,7 +26,7 @@ struct Config {
     static inline std::vector<float> landSizes = {120.f, 100.f, 140.f};
     static inline int rows = 20;
     static inline int cols = 30;
-    static inline float landTileSize = 6.f;
+    static inline float landTileSize = 24.f;
     static inline float grassTileSize = 30.f;
     static inline float growthSpeed = 0.15f;
     static inline float uiPanelWidth = 150.f;

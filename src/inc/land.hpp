@@ -15,6 +15,9 @@ class Land {
     std::vector<Tile> tiles;
     float tileSize;
     sf::Texture farmlandTexture;
+    static sf::Texture wheatTexture;
+    static sf::Texture sugarcaneTexture;
+    static sf::Texture tomatoTexture;
     bool loaded = false;
 
     Land(float tileSize = Config::landTileSize) : tileSize(tileSize) {
@@ -40,7 +43,26 @@ class Land {
                 farmlandTexture.setSmooth(true);
                 loaded = true;
             }
+            if (!wheatTexture.loadFromFile("resources/wheat1.png")) {
+                std::cerr << "Failed to load water texture!" << std::endl;
+            } else {
+                wheatTexture.setRepeated(true);
+                wheatTexture.setSmooth(true);
+            }
+            if (!sugarcaneTexture.loadFromFile("resources/sugarcane.png")) {
+                std::cerr << "Failed to load water texture!" << std::endl;
+            } else {
+                sugarcaneTexture.setRepeated(true);
+                sugarcaneTexture.setSmooth(true);
+            }
+            if (!tomatoTexture.loadFromFile("resources/tomato.png")) {
+                std::cerr << "Failed to load water texture!" << std::endl;
+            } else {
+                tomatoTexture.setRepeated(true);
+                tomatoTexture.setSmooth(true);
+            }
         }
+
     }
 
     void generateTiles(std::vector<Tile> ts) {
@@ -111,7 +133,7 @@ class Land {
             float tileSize = Config::landTileSize;
 
             // Generate original + 32 surrounding tiles
-            int radius = 3;  // 3 tiles in each direction → 7x7 = 49 tiles (48 neighbors + center)
+            int radius = 0;  // 3 tiles in each direction → 7x7 = 49 tiles (48 neighbors + center)
             // If you need **exactly** 32, we can restrict this, but usually 3x3 or 7x7 grids are natural.
 
             for (int dx = -radius; dx <= radius; ++dx) {
@@ -119,7 +141,7 @@ class Land {
                     float px = baseX + dx * tileSize;
                     float py = baseY + dy * tileSize;
 
-                    // --- Prevent going into UI area (left 15%) ---
+                    // --- Prevent going into UI area    (left 15%) ---
                     if (px < uiOffsetX) continue;
 
                     // Also keep within screen bounds
@@ -320,13 +342,26 @@ class Land {
 
             rect.setTexture(&farmlandTexture);
             rect.setTextureRect(sf::IntRect(0, 0, static_cast<int>(tile.size), static_cast<int>(tile.size)));
-
+            
+                
             window.draw(rect);
-
-            if (tile.hasCrop) window.draw(tile.crop.shape);
-        }
+            if(tile.hasCrop ){    
+                window.draw(tile.crop.shape);}
+                if(tile.crop.growth >= 1.f){                    
+                    if(tile.cropType.name == "Barley")
+                        tile.crop.shape.setTexture(&wheatTexture);
+                    else if(tile.cropType.name == "Tomato")
+                        tile.crop.shape.setTexture(&tomatoTexture);
+                    else if(tile.cropType.name == "Sugarcane")
+                        tile.crop.shape.setTexture(&sugarcaneTexture);
+                }
+            }
+            
     }
 };
+sf::Texture Land::wheatTexture;
+sf::Texture Land::sugarcaneTexture;
+sf::Texture Land::tomatoTexture;
 
 }  // namespace Harvestor
 

@@ -54,6 +54,7 @@ struct Tile {
     bool isInsideLand;
 
     bool hasCrop = false;
+    bool hasGrown = false;
 
     float timeToMature = -1.f;  // -1 = not matured yet
 };
@@ -170,7 +171,7 @@ class Pond {
    public:
     std::vector<sf::RectangleShape> tiles;  // Pond tiles
     float tileSize;
-    sf::Texture waterTexture;  // shared texture
+    static sf::Texture waterTexture;  // shared texture
     bool loaded = false;
 
     Pond(float tileSize = Config::landTileSize) : tileSize(tileSize) {
@@ -186,68 +187,91 @@ class Pond {
         }
     }
 
-    // Generate pond tiles from a list of positions (scaled and clamped to screen)
-    void generate(const std::vector<sf::Vector2f> &positions) {
-        tiles.clear();
-        if (positions.empty()) return;
+void generate(const std::vector<sf::Vector2f> &positions) {
+    tiles.clear();
+    if (positions.empty()) return;
 
-        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-        float screenW = static_cast<float>(desktop.width);
-        float screenH = static_cast<float>(desktop.height);
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+    float screenW = static_cast<float>(desktop.width);
+    float screenH = static_cast<float>(desktop.height);
 
-        float usableX = screenW * 0.85f;
-        float offsetX = screenW * 0.15f;
+    float usableX = screenW * 0.85f;
+    float offsetX = screenW * 0.15f;
 
-        // Find min/max
-        float minX = std::numeric_limits<float>::max();
-        float minY = std::numeric_limits<float>::max();
-        float maxX = std::numeric_limits<float>::lowest();
-        float maxY = std::numeric_limits<float>::lowest();
+    // Find min/max
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
 
-        for (auto &p : positions) {
-            minX = std::min(minX, p.x);
-            minY = std::min(minY, p.y);
-            maxX = std::max(maxX, p.x);
-            maxY = std::max(maxY, p.y);
-        }
-
-        float rangeX = maxX - minX;
-        float rangeY = maxY - minY;
-        if (rangeX == 0 || rangeY == 0) return;
-
-        float scaleX = usableX / rangeX;
-        float scaleY = screenH / rangeY;
-        float scale = std::min(scaleX, scaleY);
-
-        // Variable for number of tiles around the center (neighborRadius)
-        int neighborRadius = 3;  // creates (2*2+1)^2 - 1 = 24 neighbors by default
-
-        for (auto &pos : positions) {
-            float centerX = (pos.x - minX) * scale + offsetX;
-            float centerY = (pos.y - minY) * scale;
-
-            // Generate neighbors
-            for (int dx = -neighborRadius; dx <= neighborRadius; dx++) {
-                for (int dy = -neighborRadius; dy <= neighborRadius; dy++) {
-                    if (dx == 0 && dy == 0) continue;  // skip center
-                    sf::RectangleShape rect(sf::Vector2f(tileSize, tileSize));
-                    rect.setPosition(centerX + dx * tileSize, centerY + dy * tileSize);
-                    rect.setTexture(&waterTexture);
-                    rect.setFillColor(sf::Color::Blue);
-                    tiles.push_back(rect);
-                }
-            }
-
-            // Add center tile
-            sf::RectangleShape centerTile(sf::Vector2f(tileSize, tileSize));
-            centerTile.setPosition(centerX, centerY);
-            centerTile.setTexture(&waterTexture);
-            centerTile.setFillColor(sf::Color::Blue);
-            tiles.push_back(centerTile);
-        }
-
-        std::cout << "Generated " << tiles.size() << " pond tiles with neighbors.\n";
+    for (auto &p : positions) {
+        minX = std::min(minX, p.x);
+        minY = std::min(minY, p.y);
+        maxX = std::max(maxX, p.x);
+        maxY = std::max(maxY, p.y);
     }
+
+    float rangeX = maxX - minX;
+    float rangeY = maxY - minY;
+    if (rangeX == 0 || rangeY == 0) return;
+
+    float scaleX = usableX / rangeX;
+    float scaleY = screenH / rangeY;
+    float scale = std::min(scaleX, scaleY);
+
+    int neighborRadius = 0;
+    // tileSize*=3;
+
+    for (auto &pos : positions) {
+        float centerX = (pos.x - minX) * scale + offsetX;
+        float centerY = (pos.y - minY) * scale;
+
+        // Generate neighbors
+        for (int dx = -neighborRadius; dx <= neighborRadius; dx++) {
+            for (int dy = -neighborRadius; dy <= neighborRadius; dy++) {
+                if (dx == 0 && dy == 0) continue;  // skip center
+
+                sf::RectangleShape rect(sf::Vector2f(tileSize, tileSize));
+                rect.setPosition(centerX + dx * tileSize, centerY + dy * tileSize);
+                // rect.setTexture(&waterTexture);
+
+                // Base tint color
+                sf::Color base(60, 160, 210);
+
+                // Random variation
+                int r = base.r + (rand() % 15 - 7);
+                int g = base.g + (rand() % 15 - 7);
+                int b = base.b + (rand() % 15 - 7);
+
+                // Depth effect (darker towards center, lighter outward)
+                float dist = std::sqrt(dx * dx + dy * dy);
+                float depthFactor = 1.0f - dist * 0.1f;
+                depthFactor = std::clamp(depthFactor, 0.7f, 1.1f);
+
+                rect.setFillColor(sf::Color(
+                    std::clamp(int(r * depthFactor), 0, 255),
+                    std::clamp(int(g * depthFactor), 0, 255),
+                    std::clamp(int(b * depthFactor), 0, 255),
+                    220  // slight transparency
+                ));
+
+                tiles.push_back(rect);
+            }
+        }
+
+        // Add center tile
+        sf::RectangleShape centerTile(sf::Vector2f(tileSize, tileSize));
+        centerTile.setPosition(centerX, centerY);
+        centerTile.setTexture(&waterTexture);
+
+        // Darker center to imply depth
+        // centerTile.setFillColor(sf::Color(90, 190, 230, 230));
+        tiles.push_back(centerTile);
+    }
+
+    std::cout << "Generated " << tiles.size() << " pond tiles with neighbors.\n";
+}
+
 
     void draw(sf::RenderWindow &window) {
         for (auto &rect : tiles) {
@@ -255,6 +279,7 @@ class Pond {
         }
     }
 };
+sf::Texture Pond::waterTexture;  // shared texture
 
 // Utility functions for RGB <-> HSL
 struct ColorUtils {

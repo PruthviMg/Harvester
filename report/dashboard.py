@@ -9,7 +9,7 @@ from dash import Dash, dcc, html, Input, Output
 # Load datasets
 # -----------------------------
 soil_df = pd.read_csv("soil_data.csv")
-crop_df = pd.read_csv("crop_data.csv")
+crop_df = pd.read_csv("simulation_output.csv")
 
 # -----------------------------
 # Merge soil and crop data for analysis
