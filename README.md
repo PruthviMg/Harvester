@@ -32,7 +32,7 @@ The project offers both a **visual simulation** (interactive graphics) and a **d
 ---
 
 ## ⚡ Installation & Execution  
-
+- Setup Codebase
 ```bash
 # Clone repository
 git clone https://github.com/your-username/Harvestor.git
@@ -41,6 +41,7 @@ cd Harvestor
 # Build and Execution
 ./run.sh
 ```
+ - In the "input/config.json" file, set the "API_KEY" to your Google Gemini API Key.
 ---
 
 ## ⚡ Quick Start Usage Example
