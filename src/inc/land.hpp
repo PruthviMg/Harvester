@@ -4,6 +4,7 @@
 #include <SFML/Graphics/Color.hpp>
 
 #include "common.hpp"
+#include "normalizer.hpp"
 
 namespace Harvestor {
 // ---------------- Land ----------------
@@ -74,7 +75,7 @@ class Land {
         }
     }
 
-    void generateTiles(const std::vector<std::array<float, 9>> &soilMatrix = {}) {
+    void generateTiles(const std::vector<std::array<float, 9>> &soilMatrix) {
         tiles.clear();
 
         if (soilMatrix.empty()) {
@@ -82,70 +83,34 @@ class Land {
             return;
         }
 
-        // Step 1: Find min/max of x and y from CSV
-        float minX = std::numeric_limits<float>::max();
-        float minY = std::numeric_limits<float>::max();
-        float maxX = std::numeric_limits<float>::lowest();
-        float maxY = std::numeric_limits<float>::lowest();
-
-        for (const auto &vals : soilMatrix) {
-            minX = std::min(minX, vals[0]);
-            minY = std::min(minY, vals[1]);
-            maxX = std::max(maxX, vals[0]);
-            maxY = std::max(maxY, vals[1]);
+        // Extract just positions for normalization
+        std::vector<sf::Vector2f> positions;
+        positions.reserve(soilMatrix.size());
+        for (auto &vals : soilMatrix) {
+            positions.push_back({vals[0], vals[1]});
         }
 
-        float rangeX = maxX - minX;
-        float rangeY = maxY - minY;
+        Normalizer normalizer(positions);
 
-        if (rangeX == 0 || rangeY == 0) {
-            std::cerr << "Invalid CSV coordinates, cannot scale.\n";
-            return;
-        }
+        int neighborRadius = 0;  // 1 → 3x3 = 9 tiles (center + 8 neighbors)
+                                 // 2 → 5x5 = 25 tiles, etc.
 
-        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-        float screenW = (float)desktop.width;
-        float screenH = (float)desktop.height;
-
-        // Reserve 15% for UI → usable area is 85%
-        float usableW = screenW * 0.85f;
-        float uiOffsetX = screenW * 0.15f;
-
-        float scaleX = usableW / rangeX;
-        float scaleY = screenH / rangeY;
-
-        // Keep aspect ratio
-        float scale = std::min(scaleX, scaleY);
-
-        // Step 3: Generate tiles + surrounding 32
         for (const auto &vals : soilMatrix) {
-            // Base normalized position
-            float normX = (vals[0] - minX) * scale;
-            float normY = (vals[1] - minY) * scale;
-
-            float offsetX = uiOffsetX + (usableW - (rangeX * scale)) / 2.f;
-            float offsetY = (screenH - (rangeY * scale)) / 2.f;
-
-            float baseX = normX + offsetX;
-            float baseY = normY + offsetY;
-
+            sf::Vector2f base = normalizer.normalize({vals[0], vals[1]});
             float tileSize = Config::landTileSize;
 
-            // Generate original + 32 surrounding tiles
-            int radius = 0;  // 3 tiles in each direction → 7x7 = 49 tiles (48 neighbors + center)
-            // If you need **exactly** 32, we can restrict this, but usually 3x3 or 7x7 grids are natural.
+            // generate neighbors
+            for (int dx = -neighborRadius; dx <= neighborRadius; ++dx) {
+                for (int dy = -neighborRadius; dy <= neighborRadius; ++dy) {
+                    float px = base.x + dx * tileSize;
+                    float py = base.y + dy * tileSize;
 
-            for (int dx = -radius; dx <= radius; ++dx) {
-                for (int dy = -radius; dy <= radius; ++dy) {
-                    float px = baseX + dx * tileSize;
-                    float py = baseY + dy * tileSize;
+                    // Skip anything inside UI reserved area (15% left side)
+                    if (px < (normalizer.screenW * 0.15f)) continue;
 
-                    // --- Prevent going into UI area    (left 15%) ---
-                    if (px < uiOffsetX) continue;
-
-                    // Also keep within screen bounds
-                    if (px + tileSize > screenW) continue;
-                    if (py < 0 || py + tileSize > screenH) continue;
+                    // Keep inside screen
+                    if (px + tileSize > normalizer.screenW) continue;
+                    if (py < 0 || py + tileSize > normalizer.screenH) continue;
 
                     Tile t;
                     t.position = sf::Vector2f(px, py);
@@ -161,7 +126,6 @@ class Land {
                     t.organicMatter = vals[6];
                     t.compaction = vals[7];
                     t.salinity = vals[8];
-
                     t.waterLevel = 0.f;
 
                     tiles.push_back(t);
@@ -169,7 +133,7 @@ class Land {
             }
         }
 
-        std::cout << "Generated " << tiles.size() << " tiles (with 32 neighbors each).\n";
+        std::cout << "Generated " << tiles.size() << " land tiles (with neighbors).\n";
     }
 
     float computeSoilQuality(const Tile &tile, const CropType &crop) {

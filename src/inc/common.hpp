@@ -2,6 +2,7 @@
 #define COMMON_HPP_
 
 #include "config.hpp"
+#include "normalizer.hpp"
 
 namespace Harvestor {
 
@@ -187,91 +188,51 @@ class Pond {
         }
     }
 
-void generate(const std::vector<sf::Vector2f> &positions) {
-    tiles.clear();
-    if (positions.empty()) return;
+    void generate(const std::vector<sf::Vector2f> &positions) {
+        tiles.clear();
+        if (positions.empty()) return;
 
-    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    float screenW = static_cast<float>(desktop.width);
-    float screenH = static_cast<float>(desktop.height);
+        Normalizer normalizer(positions);
 
-    float usableX = screenW * 0.85f;
-    float offsetX = screenW * 0.15f;
+        int neighborRadius = 0;  // expand if you want surrounding pond tiles
 
-    // Find min/max
-    float minX = std::numeric_limits<float>::max();
-    float minY = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::lowest();
-    float maxY = std::numeric_limits<float>::lowest();
+        for (auto &pos : positions) {
+            sf::Vector2f center = normalizer.normalize(pos);
 
-    for (auto &p : positions) {
-        minX = std::min(minX, p.x);
-        minY = std::min(minY, p.y);
-        maxX = std::max(maxX, p.x);
-        maxY = std::max(maxY, p.y);
-    }
+            // Neighbors
+            for (int dx = -neighborRadius; dx <= neighborRadius; dx++) {
+                for (int dy = -neighborRadius; dy <= neighborRadius; dy++) {
+                    if (dx == 0 && dy == 0) continue;
 
-    float rangeX = maxX - minX;
-    float rangeY = maxY - minY;
-    if (rangeX == 0 || rangeY == 0) return;
+                    sf::RectangleShape rect(sf::Vector2f(tileSize, tileSize));
+                    rect.setPosition(center.x + dx * tileSize, center.y + dy * tileSize);
 
-    float scaleX = usableX / rangeX;
-    float scaleY = screenH / rangeY;
-    float scale = std::min(scaleX, scaleY);
+                    // Base bluish tint with variation
+                    sf::Color base(60, 160, 210);
+                    int r = base.r + (rand() % 15 - 7);
+                    int g = base.g + (rand() % 15 - 7);
+                    int b = base.b + (rand() % 15 - 7);
 
-    int neighborRadius = 0;
-    // tileSize*=3;
+                    float dist = std::sqrt(dx * dx + dy * dy);
+                    float depthFactor = 1.0f - dist * 0.1f;
+                    depthFactor = std::clamp(depthFactor, 0.7f, 1.1f);
 
-    for (auto &pos : positions) {
-        float centerX = (pos.x - minX) * scale + offsetX;
-        float centerY = (pos.y - minY) * scale;
+                    rect.setFillColor(sf::Color(std::clamp(int(r * depthFactor), 0, 255), std::clamp(int(g * depthFactor), 0, 255),
+                                                std::clamp(int(b * depthFactor), 0, 255), 220));
 
-        // Generate neighbors
-        for (int dx = -neighborRadius; dx <= neighborRadius; dx++) {
-            for (int dy = -neighborRadius; dy <= neighborRadius; dy++) {
-                if (dx == 0 && dy == 0) continue;  // skip center
-
-                sf::RectangleShape rect(sf::Vector2f(tileSize, tileSize));
-                rect.setPosition(centerX + dx * tileSize, centerY + dy * tileSize);
-                // rect.setTexture(&waterTexture);
-
-                // Base tint color
-                sf::Color base(60, 160, 210);
-
-                // Random variation
-                int r = base.r + (rand() % 15 - 7);
-                int g = base.g + (rand() % 15 - 7);
-                int b = base.b + (rand() % 15 - 7);
-
-                // Depth effect (darker towards center, lighter outward)
-                float dist = std::sqrt(dx * dx + dy * dy);
-                float depthFactor = 1.0f - dist * 0.1f;
-                depthFactor = std::clamp(depthFactor, 0.7f, 1.1f);
-
-                rect.setFillColor(sf::Color(
-                    std::clamp(int(r * depthFactor), 0, 255),
-                    std::clamp(int(g * depthFactor), 0, 255),
-                    std::clamp(int(b * depthFactor), 0, 255),
-                    220  // slight transparency
-                ));
-
-                tiles.push_back(rect);
+                    tiles.push_back(rect);
+                }
             }
+
+            // Center tile with texture
+            sf::RectangleShape centerTile(sf::Vector2f(tileSize, tileSize));
+            centerTile.setPosition(center);
+            centerTile.setTexture(&waterTexture);
+            tiles.push_back(centerTile);
         }
 
-        // Add center tile
-        sf::RectangleShape centerTile(sf::Vector2f(tileSize, tileSize));
-        centerTile.setPosition(centerX, centerY);
-        centerTile.setTexture(&waterTexture);
-
-        // Darker center to imply depth
-        // centerTile.setFillColor(sf::Color(90, 190, 230, 230));
-        tiles.push_back(centerTile);
+        std::cout << "Generated " << tiles.size() << " pond tiles.\n";
     }
-
-    std::cout << "Generated " << tiles.size() << " pond tiles with neighbors.\n";
-}
-
 
     void draw(sf::RenderWindow &window) {
         for (auto &rect : tiles) {
