@@ -86,6 +86,37 @@ class SoilLoader {
 
 class FarmLoader {
    public:
+    static std::vector<sf::Vector2f> parseCSV(const std::string &filename) {
+        std::vector<sf::Vector2f> result;
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open CSV file: " << filename << std::endl;
+            return result;
+        }
+
+        std::string line;
+        // Skip header
+        if (!std::getline(file, line)) return result;
+
+        while (std::getline(file, line)) {
+            std::stringstream ss(line);
+            std::string xStr, yStr;
+            if (!std::getline(ss, xStr, ',')) continue;
+            if (!std::getline(ss, yStr, ',')) continue;
+
+            try {
+                float x = std::stof(xStr);
+                float y = std::stof(yStr);
+                result.emplace_back(x, y);
+            } catch (...) {
+                // skip invalid lines
+                continue;
+            }
+        }
+
+        return result;
+    }
+
     static void loadFromFile(const std::string &filename, std::vector<Land> &lands, std::vector<Pond> &ponds, const std::vector<CropType> &crops,
                              int selectedCropIndex) {
         std::ifstream file(filename);
@@ -97,59 +128,80 @@ class FarmLoader {
         lands.clear();
         ponds.clear();
 
-        struct TempLandData {
-            float cx, cy, r;
-        };
-        std::vector<TempLandData> tempLands;
+        auto soilMatrix = SoilLoader::loadFromFile("input/land.csv");
+        Land land(Config::landTileSize);
+        land.generateTiles(soilMatrix);
 
-        std::string type;
-        while (file >> type) {
-            if (type[0] == '#') {
-                std::getline(file, type);
-                continue;
-            }
+        lands.push_back(land);
 
-            if (type == "Land") {
-                float cx, cy, r;
-                file >> cx >> cy >> r;
-                tempLands.push_back({cx, cy, r});
-            } else if (type == "Pond") {
-                float cx, cy, r;
-                file >> cx >> cy >> r;
-                ponds.emplace_back(cx, cy, r, 0.9f, 0.9f);
-            }
-        }
-
-        // ---------------- Generate combined soil matrix ----------------
-        std::vector<Tile> allTiles;
-
-        for (auto &l : tempLands) {
-            QualityMatrix matrix(l.cx, l.cy, l.r, Config::landTileSize);
-            auto tiles = matrix.generateTiles();
-
-            Land land(l.cx, l.cy, l.r, Config::landTileSize);
-            land.generateTiles(tiles);
-
+        for (auto &land : lands) {
             if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
                 land.plantCrops(crops[selectedCropIndex]);
             }
-
-            lands.push_back(land);
-
-            allTiles.insert(allTiles.end(), tiles.begin(), tiles.end());
         }
 
-        // Save the combined soil data to CSV
-        std::ofstream soilFile(Config::soilDataFile);
-        if (!soilFile.is_open()) {
-            std::cerr << "Error: Could not open soil_data.csv for writing\n";
-        } else {
-            soilFile << "x,y,soilBaseQuality,sunlight,nutrients,pH,organicMatter,compaction,salinity\n";
-            for (auto &tile : allTiles) {
-                soilFile << tile.position.x << "," << tile.position.y << "," << tile.soilBaseQuality << "," << tile.sunlight << "," << tile.nutrients
-                         << "," << tile.pH << "," << tile.organicMatter << "," << tile.compaction << "," << tile.salinity << "\n";
-            }
-        }
+        Pond pond(Config::landTileSize);
+        auto points = parseCSV("input/water.csv");
+        std::cout << "points " << points.size() << std::endl;
+        pond.generate(points);
+
+        ponds.emplace_back(pond);
+
+        // struct TempLandData {
+        //     float cx, cy, r;
+        // };
+        // std::vector<TempLandData> tempLands;
+
+        // std::string type;
+        // while (file >> type) {
+        //     if (type[0] == '#') {
+        //         std::getline(file, type);
+        //         continue;
+        //     }
+
+        //     if (type == "Land") {
+        //         float cx, cy, r;
+        //         file >> cx >> cy >> r;
+        //         tempLands.push_back({cx, cy, r});
+        //     } else if (type == "Pond") {
+        //         float cx, cy, r;
+        //         file >> cx >> cy >> r;
+        //         ponds.emplace_back(cx, cy, r, 0.9f, 0.9f);
+        //     }
+        // }
+
+        // // ---------------- Generate combined soil matrix ----------------
+        // std::vector<Tile> allTiles;
+
+        // for (auto &l : tempLands) {
+        //     // QualityMatrix matrix(l.cx, l.cy, l.r, Config::landTileSize);
+        //     auto soilMatrix = SoilLoader::loadFromFile("input/soil_data.csv");
+        //     // auto tiles = matrix.generateTiles();
+
+        //     Land land(Config::landTileSize);
+        //     land.generateTiles(soilMatrix);
+
+        //     if (selectedCropIndex >= 0 && selectedCropIndex < crops.size()) {
+        //         land.plantCrops(crops[selectedCropIndex]);
+        //     }
+
+        //     lands.push_back(land);
+
+        //     allTiles.insert(allTiles.end(), tiles.begin(), tiles.end());
+        // }
+
+        // // Save the combined soil data to CSV
+        // std::ofstream soilFile(Config::soilDataFile);
+        // if (!soilFile.is_open()) {
+        //     std::cerr << "Error: Could not open soil_data.csv for writing\n";
+        // } else {
+        //     soilFile << "x,y,soilBaseQuality,sunlight,nutrients,pH,organicMatter,compaction,salinity\n";
+        //     for (auto &tile : allTiles) {
+        //         soilFile << tile.position.x << "," << tile.position.y << "," << tile.soilBaseQuality << "," << tile.sunlight << "," <<
+        //         tile.nutrients
+        //                  << "," << tile.pH << "," << tile.organicMatter << "," << tile.compaction << "," << tile.salinity << "\n";
+        //     }
+        // }
     }
 };
 

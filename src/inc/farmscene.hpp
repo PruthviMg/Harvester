@@ -156,19 +156,28 @@ class FarmScene {
 
                     bool hitPond = false;
                     for (auto &pond : ponds) {
-                        float dx = rd.position.x - pond.center.x;
-                        float dy = rd.position.y - pond.center.y;
-                        float dist = std::sqrt(dx * dx + dy * dy);
-                        if (dist < pond.radius) {
-                            hitPond = true;
-                            Splash s;
-                            s.position = rd.position;
-                            splashes.push_back(s);
-                            Ripple r;
-                            r.position = rd.position;
-                            ripples.push_back(r);
-                            break;
+                        bool hit = false;
+
+                        for (auto &ptile : pond.tiles) {
+                            // Compute distance from the raindrop to the center of the pond tile
+                            float dx = rd.position.x - (ptile.getPosition().x + ptile.getSize().x / 2.f);
+                            float dy = rd.position.y - (ptile.getPosition().y + ptile.getSize().y / 2.f);
+                            float dist = std::sqrt(dx * dx + dy * dy);
+
+                            // Check if the raindrop hits the pond tile (inside tile bounds)
+                            if (dist < ptile.getSize().x / 2.f) {
+                                hit = true;
+                                Splash s;
+                                s.position = rd.position;
+                                splashes.push_back(s);
+                                Ripple r;
+                                r.position = rd.position;
+                                ripples.push_back(r);
+                                break;  // Stop checking other tiles in this pond
+                            }
                         }
+
+                        if (hit) break;  // Stop checking other ponds if a hit is detected
                     }
 
                     if (rd.position.y > height || hitPond) {
@@ -220,25 +229,122 @@ class FarmScene {
     }
 
     void drawSimulationInfo() {
-        if (!simulate) return;
+        // HUD positioning
+        float padding = 16.f;
+        float barHeight = 16.f;
+        float radius = barHeight / 2.f;  // rounded ends
+        float lineSpacing = 8.f;         // space between lines
+        float textHeight = 18.f;         // approximate text height
+        float titleHeight = 28.f;
 
-        float elapsed = simClock.getElapsedTime().asSeconds();
-        std::stringstream ss;
-        ss << "Time: " << std::fixed << std::setprecision(1) << elapsed << "s";
-        sf::Text txt(ss.str(), font, 16);
-        txt.setPosition(10, height - 60);
-        txt.setFillColor(sf::Color::White);
-        window.draw(txt);
+        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+        float screenW = (float)desktop.width;
+        float hudWidth = 300.f;
+        float hudX = screenW - hudWidth - padding;  // top-right with 6.f gap
+        float hudY = padding;
 
-        for (int i = 0; i < (int)lands.size(); ++i) {
-            float pct = lands[i].getCropGrowthPercentage();
-            std::stringstream ssp;
-            ssp << "Land " << i + 1 << ": " << std::fixed << std::setprecision(0) << pct << "%";
-            sf::Text landTxt(ssp.str(), font, 14);
-            landTxt.setPosition(lands[i].center.x - lands[i].radius / 2, lands[i].center.y - lands[i].radius - 20);
-            landTxt.setFillColor(sf::Color::White);
-            window.draw(landTxt);
+        // Count elements: title + time + rain + 3 bars
+        int elements = 1 + 2 + 3;  // 1 title, 2 text lines, 3 bars
+        float boxHeight = titleHeight + elements * (barHeight + textHeight + lineSpacing) + 3 * lineSpacing;
+        sf::RectangleShape bgBox(sf::Vector2f(hudWidth, boxHeight));
+        bgBox.setPosition(hudX, hudY);
+        bgBox.setFillColor(sf::Color(40, 40, 40, 200));
+        bgBox.setOutlineColor(sf::Color::White);
+        bgBox.setOutlineThickness(2.f);
+        window.draw(bgBox);
+
+        float currentY = hudY + padding;
+
+        // Title
+        sf::Text title("Farm Status", font, 20);
+        title.setPosition(hudX + padding, currentY);
+        title.setFillColor(sf::Color(255, 215, 0));
+        window.draw(title);
+
+        currentY += titleHeight + lineSpacing;
+
+        // Time
+        float elapsed = simulate ? simClock.getElapsedTime().asSeconds() : 0.f;
+        sf::Text timeText("Time: " + std::to_string(int(elapsed)) + "s", font, 16);
+        timeText.setPosition(hudX + padding, currentY);
+        timeText.setFillColor(sf::Color::Cyan);
+        window.draw(timeText);
+
+        currentY += textHeight + lineSpacing;
+
+        // Raining info
+        sf::Text rainText("Raining: " + std::string(rainActive ? "Yes" : "No"), font, 16);
+        rainText.setPosition(hudX + padding, currentY);
+        rainText.setFillColor(rainActive ? sf::Color::Blue : sf::Color(180, 180, 180));
+        window.draw(rainText);
+
+        currentY += textHeight + 2 * lineSpacing;  // extra spacing before bars
+
+        // Compute averages
+        float avgSoil = 0.f, avgWater = 0.f, avgGrowth = 0.f;
+        int cropTiles = 0, totalTiles = 0;
+        for (auto &land : lands) {
+            totalTiles += (int)land.tiles.size();
+            for (auto &tile : land.tiles) {
+                avgSoil += land.computeSoilQuality(tile, tile.cropType);
+                avgWater += tile.waterLevel;
+                if (tile.hasCrop) {
+                    avgGrowth += tile.crop.growth;
+                    cropTiles++;
+                }
+            }
         }
+        if (totalTiles > 0) avgSoil /= totalTiles;
+        if (totalTiles > 0) avgWater /= totalTiles;
+        if (cropTiles > 0) avgGrowth /= cropTiles;
+
+        auto drawRoundedBar = [&](float y, const std::string &label, float pct, sf::Color fgColor) {
+            pct = std::clamp(pct, 0.f, 1.f);
+            // Label
+            sf::Text txt(label, font, 16);
+            txt.setPosition(hudX + padding, y);
+            txt.setFillColor(sf::Color::White);
+            window.draw(txt);
+
+            float barWidth = hudWidth - 2 * padding;
+
+            // Background bar
+            sf::RectangleShape bg(sf::Vector2f(barWidth, barHeight));
+            bg.setPosition(hudX + padding, y + textHeight);
+            bg.setFillColor(sf::Color(80, 80, 80));
+            window.draw(bg);
+
+            // Foreground bar
+            sf::RectangleShape fg(sf::Vector2f(barWidth * pct, barHeight));
+            fg.setPosition(hudX + padding, y + textHeight);
+            fg.setFillColor(fgColor);
+            window.draw(fg);
+
+            // Rounded ends using circles
+            sf::CircleShape leftCap(radius);
+            leftCap.setFillColor(fgColor);
+            leftCap.setPosition(hudX + padding - radius, y + textHeight - radius + barHeight / 2.f);
+            window.draw(leftCap);
+
+            sf::CircleShape rightCap(radius);
+            rightCap.setFillColor(fgColor);
+            rightCap.setPosition(hudX + padding + barWidth * pct - radius, y + textHeight - radius + barHeight / 2.f);
+            window.draw(rightCap);
+
+            // Percentage text
+            sf::Text pctText(std::to_string(int(pct * 100)) + "%", font, 14);
+            pctText.setPosition(hudX + hudWidth - padding - 40, y + textHeight);
+            pctText.setFillColor(sf::Color::White);
+            window.draw(pctText);
+        };
+
+        drawRoundedBar(currentY, "Avg Soil", avgSoil, sf::Color::Green);
+        currentY += barHeight + textHeight + 2 * lineSpacing;
+
+        drawRoundedBar(currentY, "Water Level", avgWater, sf::Color::Blue);
+        currentY += barHeight + textHeight + 2 * lineSpacing;
+
+        drawRoundedBar(currentY, "Crop Growth", avgGrowth, sf::Color(255, 165, 0));
     }
 
     // New: handle mouse wheel scroll (call from main loop)
@@ -336,72 +442,144 @@ class FarmScene {
         }
     }
 
+    void centerTextInButton(sf::Text &text, const sf::FloatRect &btnBounds) {
+        sf::FloatRect textBounds = text.getLocalBounds();
+        text.setOrigin(textBounds.left + textBounds.width / 2.f, textBounds.top + textBounds.height / 2.f);
+        text.setPosition(btnBounds.left + btnBounds.width / 2.f, btnBounds.top + btnBounds.height / 2.f);
+    }
+
     // Generic button drawer
-    void drawButton(float x, float &y, const std::string &label, sf::Color color, sf::Font &font, float width = -1, float height = -1) {
+    void drawButton(float x, float &y, const std::string &label, sf::Color baseColor, sf::Font &font, float width = -1, float height = -1,
+                    bool hovered = false, bool pressed = false) {
         if (width < 0) width = Config::cropButtonWidth;
         if (height < 0) height = Config::cropButtonHeight * Config::bigButtonHeightMultiplier;
 
-        sf::RectangleShape btn(sf::Vector2f(width, height));
-        btn.setPosition(x, y);
-        btn.setFillColor(color);
-        window.draw(btn);
+        float radius = 8.f;  // corner radius
+        int cornerPoints = 16;
+        float borderThickness = 2.f;
 
+        // Adjust color for hover/press
+        sf::Color color = baseColor;
+        if (hovered) color = sf::Color(std::min(255, color.r + 40), std::min(255, color.g + 40), std::min(255, color.b + 40));
+        if (pressed) color = sf::Color(std::max(0, color.r - 50), std::max(0, color.g - 50), std::max(0, color.b - 50));
+
+        sf::Color borderColor(30, 30, 30);  // dark border
+
+        // ---- Draw main rectangles ----
+        sf::RectangleShape center(sf::Vector2f(width - 2 * radius, height - 2 * radius));
+        center.setPosition(x + radius, y + radius);
+        center.setFillColor(color);
+        center.setOutlineColor(borderColor);
+        center.setOutlineThickness(borderThickness);
+        window.draw(center);
+
+        // Top/Bottom
+        sf::RectangleShape top(sf::Vector2f(width - 2 * radius, radius));
+        top.setPosition(x + radius, y);
+        top.setFillColor(color);
+        top.setOutlineColor(borderColor);
+        top.setOutlineThickness(borderThickness);
+        window.draw(top);
+
+        sf::RectangleShape bottom(sf::Vector2f(width - 2 * radius, radius));
+        bottom.setPosition(x + radius, y + height - radius);
+        bottom.setFillColor(color);
+        bottom.setOutlineColor(borderColor);
+        bottom.setOutlineThickness(borderThickness);
+        window.draw(bottom);
+
+        // Left/Right
+        sf::RectangleShape left(sf::Vector2f(radius, height - 2 * radius));
+        left.setPosition(x, y + radius);
+        left.setFillColor(color);
+        left.setOutlineColor(borderColor);
+        left.setOutlineThickness(borderThickness);
+        window.draw(left);
+
+        sf::RectangleShape right(sf::Vector2f(radius, height - 2 * radius));
+        right.setPosition(x + width - radius, y + radius);
+        right.setFillColor(color);
+        right.setOutlineColor(borderColor);
+        right.setOutlineThickness(borderThickness);
+        window.draw(right);
+
+        // ---- Draw corners with border ----
+        sf::CircleShape corner(radius, cornerPoints);
+        corner.setFillColor(color);
+        corner.setOutlineColor(borderColor);
+        corner.setOutlineThickness(borderThickness);
+
+        // Top-left
+        corner.setPosition(x, y);
+        window.draw(corner);
+        // Top-right
+        corner.setPosition(x + width - 2 * radius, y);
+        window.draw(corner);
+        // Bottom-left
+        corner.setPosition(x, y + height - 2 * radius);
+        window.draw(corner);
+        // Bottom-right
+        corner.setPosition(x + width - 2 * radius, y + height - 2 * radius);
+        window.draw(corner);
+
+        // ---- Draw text ----
         sf::Text txt(label, font, Config::bigButtonFontSize);
-        centerTextInButton(txt, btn);
+        txt.setFillColor(sf::Color::White);
+        centerTextInButton(txt, sf::FloatRect(x, y, width, height));
         window.draw(txt);
 
-        y += height + Config::cropButtonSpacing;  // move y for next button
+        // Move y for next button
+        y += height + Config::cropButtonSpacing + Config::ButtonInsideSpacing;
     }
 
     // ---------------- drawUI ----------------
     void drawUI() {
-        float x = 10.f;
-        float y = 10.f;
+        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+        float screenW = (float)desktop.width;
+        float leftPanelW = screenW * 0.15f;  // 15% left side
 
+        float x = Config::uiPadding;
+        float y = 10.f;  // top padding
+
+        // Crop dropdown
         std::vector<std::string> cropNames;
         for (auto &c : cropTypes) cropNames.push_back(c.name);
-
         std::string cropLabel =
             (selectedCropIndex >= 0 && selectedCropIndex < (int)cropTypes.size()) ? cropTypes[selectedCropIndex].name : "Select Crop";
         drawDropdown(x, y, cropLabel, cropNames, selectedCropIndex, cropDropdownActive, cropScrollOffset, Config::maxVisibleCrops);
 
+        // Layout dropdown
         std::string layoutLabel =
             (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) ? layouts[selectedLayoutIndex] : "Select Layout";
         drawDropdown(x, y, layoutLabel, layouts, selectedLayoutIndex, layoutDropdownActive, layoutScrollOffset, Config::maxVisibleLayouts);
 
-        // ---------------- Regular buttons ----------------
-        float startY = Config::ButtonPadding + Config::cropButtonHeight;
+        // Buttons start below dropdowns
+        float startY = y + Config::ButtonPadding;
         if (cropDropdownActive) startY += (std::min(Config::maxVisibleCrops, (int)cropTypes.size()) + 1) * Config::cropButtonHeight;
         if (layoutDropdownActive) startY += (std::min(Config::maxVisibleLayouts, (int)layouts.size()) + 1) * Config::cropButtonHeight;
 
-        float bigButtonHeight = Config::cropButtonHeight * Config::bigButtonHeightMultiplier;
-        float btnX = Config::uiPadding;
+        // Shrink both width and height by 50%
+        float btnWidth = (leftPanelW - 5.f * Config::uiPadding) * 0.75f;                         // half width
+        float btnHeight = Config::cropButtonHeight * Config::bigButtonHeightMultiplier * 0.75f;  // half height
+        float btnX = (leftPanelW - btnWidth) / 2.f;                                              // center horizontally
         float btnY = startY;
 
-        // Add after your regular buttons
+        sf::Color buttonBaseColor = sf::Color(50, 150, 200);
+        // Draw buttons
+        drawButton(btnX, btnY, simulate ? "Simulating" : "Start", simulate ? sf::Color(0, 255, 0) : buttonBaseColor, font, btnWidth, btnHeight);
 
-        drawButton(btnX, btnY, simulate ? "Simulating" : "Start", simulate ? Config::simulateButtonActiveColor : Config::simulateButtonColor, font,
-                   Config::cropButtonWidth, bigButtonHeight);
+        drawButton(btnX, btnY, "Reset", buttonBaseColor, font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Rain", rainActive ? sf::Color(100, 180, 255) : buttonBaseColor, font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Submit", buttonBaseColor, font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Load Layout", buttonBaseColor, font, btnWidth, btnHeight);
 
-        drawButton(btnX, btnY, "Reset", Config::resetButtonColor, font, Config::cropButtonWidth, bigButtonHeight);
+        sf::Color selectAreaColor = selectAreaActive ? sf::Color(150, 150, 150) : buttonBaseColor;
+        std::string selectText = selectAreaActive ? "Deselect" : "Select Area";
+        drawButton(btnX, btnY, selectText, selectAreaColor, font, btnWidth, btnHeight);
 
-        drawButton(btnX, btnY, "Rain", rainActive ? Config::simulateButtonActiveColor : Config::rainButtonColor, font, Config::cropButtonWidth,
-                   bigButtonHeight);
-
-        drawButton(btnX, btnY, "Submit", sf::Color(150, 150, 250), font, Config::cropButtonWidth, bigButtonHeight);
-
-        drawButton(btnX, btnY, "Load Layout", sf::Color(150, 50, 100), font, Config::cropButtonWidth, bigButtonHeight);
-
-        sf::Color selectAreaColor = selectAreaActive ? sf::Color(255, 105, 180)   // active: pink
-                                                     : sf::Color(150, 150, 150);  // inactive: grey
-        std::string selectText = selectAreaActive ? "Deselect"                    // active: green
-                                                  : "Select Area";                // inactive: yellow
-        drawButton(btnX, btnY, selectText, selectAreaColor, font, Config::cropButtonWidth, bigButtonHeight);
-
-        drawButton(btnX, btnY, "Plant Crops", sf::Color(100, 200, 100), font, Config::cropButtonWidth, bigButtonHeight);
-
-        drawButton(btnX, btnY, "Clear Results", sf::Color(255, 0, 0), font, Config::cropButtonWidth, bigButtonHeight);
-        drawButton(btnX, btnY, "Analyse", sf::Color(255, 0, 0), font, Config::cropButtonWidth, bigButtonHeight);
+        drawButton(btnX, btnY, "Plant Crops", buttonBaseColor, font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Clear Results", buttonBaseColor, font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Analyse", buttonBaseColor, font, btnWidth, btnHeight);
     }
 
     // Generic dropdown click handler
@@ -457,7 +635,11 @@ class FarmScene {
 
     // ---------------- handleClick ----------------
     void handleClick(sf::Vector2i mousePos) {
-        float x = 10.f;
+        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+        float screenW = (float)desktop.width;
+        float leftPanelW = screenW * 0.15f;
+
+        float x = Config::uiPadding;
         float y = 10.f;
 
         // Crop dropdown
@@ -474,76 +656,58 @@ class FarmScene {
             return;
         }
 
-        // ---------------- Regular buttons ----------------
-        float startY = Config::ButtonPadding + (cropDropdownActive ? (cropTypes.size() + 1) * Config::cropButtonHeight : Config::cropButtonHeight);
-        startY += layoutDropdownActive ? (std::min(Config::maxVisibleLayouts, (int)layouts.size()) + 1) * Config::cropButtonHeight
-                                       : Config::cropButtonHeight;
+        // Buttons start below dropdowns
+        float startY = y + Config::ButtonPadding;
+        if (cropDropdownActive) startY += (std::min(Config::maxVisibleCrops, (int)cropTypes.size()) + 1) * Config::cropButtonHeight;
+        if (layoutDropdownActive) startY += (std::min(Config::maxVisibleLayouts, (int)layouts.size()) + 1) * Config::cropButtonHeight;
 
-        float bigButtonHeight = Config::cropButtonHeight * Config::bigButtonHeightMultiplier;
+        float btnWidth = (leftPanelW - 5.f * Config::uiPadding) * 0.75f;  // same as drawUI
+        float btnHeight = Config::cropButtonHeight * Config::bigButtonHeightMultiplier * 0.75f;
+        float btnX = (leftPanelW - btnWidth) / 2.f;
 
-        sf::FloatRect simBtnRect(Config::uiPadding, startY, Config::cropButtonWidth, bigButtonHeight);
-        sf::FloatRect resetBtnRect(Config::uiPadding, startY + bigButtonHeight + Config::cropButtonSpacing, Config::cropButtonWidth, bigButtonHeight);
-        sf::FloatRect rainBtnRect(Config::uiPadding, startY + 2 * bigButtonHeight + 2 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                  bigButtonHeight);
-        sf::FloatRect saveBtnRect(Config::uiPadding, startY + 3 * bigButtonHeight + 3 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                  bigButtonHeight);
-        sf::FloatRect loadLayoutBtnRect(Config::uiPadding, startY + 4 * bigButtonHeight + 4 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                        bigButtonHeight);
-        sf::FloatRect selectAreaBtnRect(Config::uiPadding, startY + 5 * bigButtonHeight + 5 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                        bigButtonHeight);
-        sf::FloatRect plantBtnRect(Config::uiPadding, startY + 6 * bigButtonHeight + 6 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                   bigButtonHeight);
-        sf::FloatRect clearResultsBtnRect(Config::uiPadding, startY + 7 * bigButtonHeight + 7 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                          bigButtonHeight);
-        sf::FloatRect analyseBtnRect(Config::uiPadding, startY + 8 * bigButtonHeight + 8 * Config::cropButtonSpacing, Config::cropButtonWidth,
-                                     bigButtonHeight);
+        float extraSpacing = 6.f;  // same as drawButton spacing
+        float currentY = startY;
 
-        if (loadLayoutBtnRect.contains(mousePos.x, mousePos.y)) {
-            if (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) {
-                std::string layoutPath = getLayoutFullPath(selectedLayoutIndex);
-                std::cout << "Loading layout: " << layoutPath << "\n";
-                generateFromFile(layoutPath + ".txt");
+        auto checkButtonClick = [&](const std::string &label, std::function<void()> callback) {
+            sf::FloatRect rect(btnX, currentY, btnWidth, btnHeight);
+            if (rect.contains((float)mousePos.x, (float)mousePos.y)) {
+                callback();
+                return true;
             }
-            return;
-        }
+            currentY += btnHeight + Config::cropButtonSpacing + extraSpacing;
+            return false;
+        };
 
-        if (simBtnRect.contains(mousePos.x, mousePos.y)) {
-            simulate = !simulate;
+        // Sequentially check each button
+        if (checkButtonClick(simulate ? "Simulating" : "Start", [&]() {
+                if (!simulate) simClock.restart();
+                simulate = !simulate;
+            }))
             return;
-        }
-        if (resetBtnRect.contains(mousePos.x, mousePos.y)) {
-            reset();
+        if (checkButtonClick("Reset", [&]() { reset(); })) return;
+        if (checkButtonClick("Rain", [&]() { startRain(); })) return;
+        if (checkButtonClick("Submit", [&]() {
+                writeSimulationOutput("simulation_output.csv");
+                evaluator.updateSoilData();
+                evaluator.updateCropData();
+            }))
             return;
-        }
-        if (rainBtnRect.contains(mousePos.x, mousePos.y)) {
-            startRain();
+        if (checkButtonClick("Load Layout", [&]() {
+                if (selectedLayoutIndex >= 0 && selectedLayoutIndex < (int)layouts.size()) {
+                    std::string layoutPath = getLayoutFullPath(selectedLayoutIndex);
+                    std::cout << "Loading layout: " << layoutPath << "\n";
+                    generateFromFile(layoutPath + ".txt");
+                }
+            }))
             return;
-        }
-        if (saveBtnRect.contains(mousePos.x, mousePos.y)) {
-            writeSimulationOutput("simulation_output.csv");
-            evaluator.updateSoilData();
-            evaluator.updateCropData();
+        if (checkButtonClick(selectAreaActive ? "Deselect" : "Select Area", [&]() {
+                handleSelectButtonClick();
+                showAnalysisPopup = false;
+            }))
             return;
-        }
-        if (selectAreaBtnRect.contains(mousePos.x, mousePos.y)) {
-            handleSelectButtonClick();
-            showAnalysisPopup = false;
-            return;
-        }
-
-        if (plantBtnRect.contains(mousePos.x, mousePos.y)) {
-            plantCropsInSelection();
-            return;
-        }
-
-        if (clearResultsBtnRect.contains(mousePos.x, mousePos.y)) {
-            clearSimulationResults();
-            return;
-        }
-        if (analyseBtnRect.contains(mousePos.x, mousePos.y)) {
-            analyzeSelectedArea();
-            return;
-        }
+        if (checkButtonClick("Plant Crops", [&]() { plantCropsInSelection(); })) return;
+        if (checkButtonClick("Clear Results", [&]() { clearSimulationResults(); })) return;
+        if (checkButtonClick("Analyse", [&]() { analyzeSelectedArea(); })) return;
     }
 
     void plantCropsInSelection() {
@@ -666,7 +830,7 @@ class FarmScene {
 
         if (showAnalysisPopup) {
             // Draw popup
-            sf::RectangleShape popup(sf::Vector2f(250.f, 120.f));
+            sf::RectangleShape popup(sf::Vector2f(250.f, 80.f));
             popup.setFillColor(sf::Color(50, 50, 50, 230));
             popup.setOutlineColor(sf::Color::White);
             popup.setOutlineThickness(2.f);
@@ -681,7 +845,7 @@ class FarmScene {
             // ---------------- Collect tiles inside selection ----------------
             sf::FloatRect selRect = selectionRect.getGlobalBounds();
 
-            std::vector<std::tuple<int, int, std::string>> selectedTiles;  // landIndex, tileIndex, cropName
+            std::vector<std::tuple<int, int>> selectedTiles;  // landIndex, tileIndex, cropName
 
             for (int landIdx = 0; landIdx < (int)lands.size(); ++landIdx) {
                 const auto &land = lands[landIdx];
@@ -689,8 +853,8 @@ class FarmScene {
                     const auto &tile = land.tiles[tileIdx];
                     sf::FloatRect tileRect(tile.position, sf::Vector2f(tile.size, tile.size));
 
-                    if (selRect.intersects(tileRect) && tile.hasCrop) {
-                        selectedTiles.emplace_back(landIdx, tileIdx, cropTypes[selectedCropIndex].name);
+                    if (selRect.intersects(tileRect)) {
+                        selectedTiles.emplace_back(landIdx, tileIdx);
                     }
                 }
             }
@@ -701,10 +865,10 @@ class FarmScene {
             countText.setPosition(popup.getPosition().x + 10.f, popup.getPosition().y + 40.f);
             window.draw(countText);
 
-            sf::Text cropText("BestCrop: " + bestCrop, font, 14);
-            cropText.setFillColor(sf::Color::White);
-            cropText.setPosition(popup.getPosition().x + 10.f, popup.getPosition().y + 80.f);
-            window.draw(cropText);
+            // sf::Text cropText("BestCrop: " + bestCrop, font, 14);
+            // cropText.setFillColor(sf::Color::White);
+            // cropText.setPosition(popup.getPosition().x + 10.f, popup.getPosition().y + 80.f);
+            // window.draw(cropText);
         }
     }
 
@@ -781,7 +945,7 @@ class FarmScene {
                 tile.soilQuality = 0.f;
                 tile.timeToMature = -1.f;
             }
-            land.plantCrops(cropTypes[selectedCropIndex]);
+            // land.plantCrops(cropTypes[selectedCropIndex]);
         }
         simClock.restart();
     }

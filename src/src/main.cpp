@@ -14,7 +14,7 @@ int main() {
     // Config setup
     Config::uiPanelWidth = width * 0.15f;  // 15% for UI
     Config::grassTileSize = std::min((width - Config::uiPanelWidth) / Config::cols, height / Config::rows);
-    Config::landTileSize = Config::grassTileSize / 5.f;
+    Config::landTileSize = Config::landTileSize;
     Config::cropButtonWidth = Config::uiPanelWidth - 20.f;
 
     // Create window

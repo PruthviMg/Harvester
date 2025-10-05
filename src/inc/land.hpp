@@ -1,6 +1,8 @@
 #ifndef LAND_HPP_
 #define LAND_HPP_
 
+#include <SFML/Graphics/Color.hpp>
+
 #include "common.hpp"
 
 namespace Harvestor {
@@ -12,13 +14,11 @@ class Land {
     float radius;
     std::vector<Tile> tiles;
     float tileSize;
+    sf::Texture farmlandTexture;
+    bool loaded = false;
 
-    Land(float cx, float cy, float r, float tileSize = Config::landTileSize) : center(cx, cy), radius(r), tileSize(tileSize) {
-        shape = BlobGenerator::generate(cx, cy, r, 25, 0.25f);
-
-        // --- Load farmland texture ---
-        static sf::Texture farmlandTexture;
-        static bool loaded = false;
+    Land(float tileSize = Config::landTileSize) : tileSize(tileSize) {
+        // Load farmland texture once
         if (!loaded) {
             sf::Image img;
             if (!img.loadFromFile("resources/combined.png")) {
@@ -41,12 +41,6 @@ class Land {
                 loaded = true;
             }
         }
-
-        // Apply cropped texture
-        shape.setTexture(&farmlandTexture);
-
-        // Tile across the blob
-        shape.setTextureRect(sf::IntRect(0, 0, static_cast<int>(2 * radius), static_cast<int>(2 * radius)));
     }
 
     void generateTiles(std::vector<Tile> ts) {
@@ -67,32 +61,94 @@ class Land {
             return;
         }
 
+        // Step 1: Find min/max of x and y from CSV
+        float minX = std::numeric_limits<float>::max();
+        float minY = std::numeric_limits<float>::max();
+        float maxX = std::numeric_limits<float>::lowest();
+        float maxY = std::numeric_limits<float>::lowest();
+
         for (const auto &vals : soilMatrix) {
-            // vals = {soilBaseQuality, sunlight, nutrients, pH, organicMatter, compaction, salinity}
-            // We'll also read x,y from the file for tile position if needed
-
-            Tile t;
-            // If you stored x,y in the CSV as the first two columns:
-            t.position = sf::Vector2f(vals[0], vals[1]);  // <-- adjust if x,y are separate
-            t.size = Config::landTileSize;
-            t.isInsideLand = true;
-            t.hasCrop = false;
-
-            // Soil attributes from CSV
-            t.soilBaseQuality = vals[2];
-            t.sunlight = vals[3];
-            t.nutrients = vals[4];
-            t.pH = vals[5];
-            t.organicMatter = vals[6];
-            t.compaction = vals[7];
-            t.salinity = vals[8];
-
-            t.waterLevel = 0.f;
-
-            tiles.push_back(t);
+            minX = std::min(minX, vals[0]);
+            minY = std::min(minY, vals[1]);
+            maxX = std::max(maxX, vals[0]);
+            maxY = std::max(maxY, vals[1]);
         }
 
-        std::cout << "Generated " << tiles.size() << " tiles directly from soil matrix.\n";
+        float rangeX = maxX - minX;
+        float rangeY = maxY - minY;
+
+        if (rangeX == 0 || rangeY == 0) {
+            std::cerr << "Invalid CSV coordinates, cannot scale.\n";
+            return;
+        }
+
+        sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+        float screenW = (float)desktop.width;
+        float screenH = (float)desktop.height;
+
+        // Reserve 15% for UI → usable area is 85%
+        float usableW = screenW * 0.85f;
+        float uiOffsetX = screenW * 0.15f;
+
+        float scaleX = usableW / rangeX;
+        float scaleY = screenH / rangeY;
+
+        // Keep aspect ratio
+        float scale = std::min(scaleX, scaleY);
+
+        // Step 3: Generate tiles + surrounding 32
+        for (const auto &vals : soilMatrix) {
+            // Base normalized position
+            float normX = (vals[0] - minX) * scale;
+            float normY = (vals[1] - minY) * scale;
+
+            float offsetX = uiOffsetX + (usableW - (rangeX * scale)) / 2.f;
+            float offsetY = (screenH - (rangeY * scale)) / 2.f;
+
+            float baseX = normX + offsetX;
+            float baseY = normY + offsetY;
+
+            float tileSize = Config::landTileSize;
+
+            // Generate original + 32 surrounding tiles
+            int radius = 3;  // 3 tiles in each direction → 7x7 = 49 tiles (48 neighbors + center)
+            // If you need **exactly** 32, we can restrict this, but usually 3x3 or 7x7 grids are natural.
+
+            for (int dx = -radius; dx <= radius; ++dx) {
+                for (int dy = -radius; dy <= radius; ++dy) {
+                    float px = baseX + dx * tileSize;
+                    float py = baseY + dy * tileSize;
+
+                    // --- Prevent going into UI area (left 15%) ---
+                    if (px < uiOffsetX) continue;
+
+                    // Also keep within screen bounds
+                    if (px + tileSize > screenW) continue;
+                    if (py < 0 || py + tileSize > screenH) continue;
+
+                    Tile t;
+                    t.position = sf::Vector2f(px, py);
+                    t.size = tileSize;
+                    t.isInsideLand = true;
+                    t.hasCrop = false;
+
+                    // Soil attributes
+                    t.soilBaseQuality = vals[2];
+                    t.sunlight = vals[3];
+                    t.nutrients = vals[4];
+                    t.pH = vals[5];
+                    t.organicMatter = vals[6];
+                    t.compaction = vals[7];
+                    t.salinity = vals[8];
+
+                    t.waterLevel = 0.f;
+
+                    tiles.push_back(t);
+                }
+            }
+        }
+
+        std::cout << "Generated " << tiles.size() << " tiles (with 32 neighbors each).\n";
     }
 
     float computeSoilQuality(const Tile &tile, const CropType &crop) {
@@ -114,17 +170,21 @@ class Land {
 
     // ---------------- Update Tile Water ----------------
     void updateTileWater(Tile &tile, const std::vector<Pond> &ponds, float dt, const CropType &cropType) {
-        // Gradually move water level toward optimal water from nearby ponds
         float targetWater = 0.f;
 
-        for (auto &pond : ponds) {
-            float dx = tile.position.x - pond.center.x;
-            float dy = tile.position.y - pond.center.y;
-            float dist = std::sqrt(dx * dx + dy * dy);
+        for (const auto &pond : ponds) {
+            for (const auto &ptile : pond.tiles) {
+                // Compute center-to-center distance
+                float dx = (tile.position.x + tile.size / 2.f) - (ptile.getPosition().x + ptile.getSize().x / 2.f);
+                float dy = (tile.position.y + tile.size / 2.f) - (ptile.getPosition().y + ptile.getSize().y / 2.f);
+                float dist = std::sqrt(dx * dx + dy * dy);
 
-            // Water contribution decreases with distance
-            float waterFactor = std::max(0.f, 1.f - dist / (pond.radius * 5.f));
-            targetWater = std::max(targetWater, waterFactor * cropType.optimalWater);
+                // Water contribution decreases with distance (max distance = 5 * tile size)
+                float waterFactor = std::max(0.f, 1.f - dist / (ptile.getSize().x * 5.f));
+
+                // Take the maximum water factor among all pond tiles
+                targetWater = std::max(targetWater, waterFactor * cropType.optimalWater);
+            }
         }
 
         // Smoothly approach target water level
@@ -176,13 +236,18 @@ class Land {
             // ---------------- Water from Ponds ----------------
             float targetWater = 0.f;
             for (const auto &pond : ponds) {
-                float dx = tile.position.x - pond.center.x;
-                float dy = tile.position.y - pond.center.y;
-                float distToPond = std::sqrt(dx * dx + dy * dy);
+                for (const auto &ptile : pond.tiles) {
+                    // Compute center-to-center distance between the land tile and pond tile
+                    float dx = (tile.position.x + tile.size / 2.f) - (ptile.getPosition().x + ptile.getSize().x / 2.f);
+                    float dy = (tile.position.y + tile.size / 2.f) - (ptile.getPosition().y + ptile.getSize().y / 2.f);
+                    float dist = std::sqrt(dx * dx + dy * dy);
 
-                // Water contribution decreases with distance
-                float waterFactor = std::max(0.f, 1.f - distToPond / (pond.radius * 5.f));
-                targetWater = std::max(targetWater, waterFactor * cropType.optimalWater);
+                    // Water contribution decreases with distance (max distance = 5 * pond tile size)
+                    float waterFactor = std::max(0.f, 1.f - dist / (ptile.getSize().x * 5.f));
+
+                    // Take the maximum contribution from all pond tiles
+                    targetWater = std::max(targetWater, waterFactor * cropType.optimalWater);
+                }
             }
 
             // Smoothly approach target water level
@@ -247,9 +312,19 @@ class Land {
     }
 
     void draw(sf::RenderWindow &window, const CropType &cropType) {
-        window.draw(shape);
-        for (auto &tile : tiles)
+        // window.draw(shape);
+        for (auto &tile : tiles) {
+            // std::cout << tile.position.x << " " << tile.position.y << std::endl;
+            sf::RectangleShape rect(sf::Vector2f(tile.size, tile.size));
+            rect.setPosition(tile.position);
+
+            rect.setTexture(&farmlandTexture);
+            rect.setTextureRect(sf::IntRect(0, 0, static_cast<int>(tile.size), static_cast<int>(tile.size)));
+
+            window.draw(rect);
+
             if (tile.hasCrop) window.draw(tile.crop.shape);
+        }
     }
 };
 

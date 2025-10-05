@@ -1,16 +1,17 @@
 #ifndef EVALUATOR_HPP_
 #define EVALUATOR_HPP_
 
+#include <curl/curl.h>
+
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <nlohmann/json.hpp>
-#include <curl/curl.h>
-#include <filesystem>
 
 #include "common.hpp"
 namespace fs = std::filesystem;
@@ -22,13 +23,10 @@ class Evaluator {
     Evaluator(float precision = 0.001f) : precision_(precision) {}
     // Gemini LLM CSV analysis
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    ((std::string*)userp)->append((char*)contents, size * nmemb);
-    return size * nmemb;
+        ((std::string*)userp)->append((char*)contents, size * nmemb);
+        return size * nmemb;
     }
-    void dumpLLMReport(const std::string& report_filename,
-                   const std::string& analysis,
-                   const std::string& bestCrop) const
-    {
+    void dumpLLMReport(const std::string& report_filename, const std::string& analysis, const std::string& bestCrop) const {
         std::ofstream file(report_filename);
         if (!file.is_open()) {
             std::cerr << "Failed to create report: " << report_filename << "\n";
@@ -92,44 +90,38 @@ class Evaluator {
         if (!file.eof()) {
             csvContent += "\n[Note: Only the first 100 lines are sent to the LLM]\n";
         }
-std::string prompt =
-"You are a data analyst tasked with generating an HTML-only report based on two input datasets:\n\n"
-"1. Dataset A (soil data): grid-based values such as soil_compatibility, nutrient levels, pH, or other soil metrics.\n"
-"2. Dataset B (yield data): grid-based yield measurements, yield proxies, or quality metrics.\n\n"
-"Instructions:\n\n"
-"- Analyze the datasets together and generate insights only in HTML format. No plain text outside <html>.\n"
-"- Structure the report with <h2> sections, <ul>/<li> bullet points, and <table> comparisons where needed.\n"
-"- Highlight how soil factors from Dataset A relate to yield outcomes in Dataset B.\n\n"
-"Sections to include:\n\n"
-"1. Spatial Yield Variation\n"
-"- Describe patterns of variation across coordinates (high vs low performing patches)\n"
-"- Note ranges or clusters\n\n"
-"2. Soil-Yield Relationship\n"
-"- Explain correlations (e.g., higher soil_compatibility -> faster growth, better yield)\n"
-"- Highlight thresholds where soil affects yield\n\n"
-"3. Crop Comparison (if multiple crops)\n"
-"- Compare robustness and sensitivity\n"
-"- Identify which crop performs more consistently vs variable\n\n"
-"4. Field Management Zones\n"
-"- Identify zones for variable management (fertilizer, irrigation)\n"
-"- Define rules for high-performing vs low-performing zones\n\n"
-"5. Actionable Agronomy Insights\n"
-"- Practical interventions based on thresholds (e.g., soil pH below 5.5 requires lime)\n"
-"- Crop choice guidance\n\n"
-"6. Business/Tech Impact\n"
-"- Insights can power farm decision-support tools\n"
-"- Suggest monetization (SaaS dashboards, consultancy)\n\n"
-"7. Concrete Next Steps\n"
-"- Generate heatmaps, run correlation analysis, define soil thresholds, build dashboard\n\n"
-"Final output: Complete <html>...</html> report, structured and professional.";
-        prompt += "\n\nHere are the datasets:\n\n" + csvContent ;
-        json payload = {
-            {"model", "gemini-2.0-flash-001"},
-            {"messages", {
-                {{"role", "user"}, {"content",prompt }}
-            }}
-        };
-
+        std::string prompt =
+            "You are a data analyst tasked with generating an HTML-only report based on two input datasets:\n\n"
+            "1. Dataset A (soil data): grid-based values such as soil_compatibility, nutrient levels, pH, or other soil metrics.\n"
+            "2. Dataset B (yield data): grid-based yield measurements, yield proxies, or quality metrics.\n\n"
+            "Instructions:\n\n"
+            "- Analyze the datasets together and generate insights only in HTML format. No plain text outside <html>.\n"
+            "- Structure the report with <h2> sections, <ul>/<li> bullet points, and <table> comparisons where needed.\n"
+            "- Highlight how soil factors from Dataset A relate to yield outcomes in Dataset B.\n\n"
+            "Sections to include:\n\n"
+            "1. Spatial Yield Variation\n"
+            "- Describe patterns of variation across coordinates (high vs low performing patches)\n"
+            "- Note ranges or clusters\n\n"
+            "2. Soil-Yield Relationship\n"
+            "- Explain correlations (e.g., higher soil_compatibility -> faster growth, better yield)\n"
+            "- Highlight thresholds where soil affects yield\n\n"
+            "3. Crop Comparison (if multiple crops)\n"
+            "- Compare robustness and sensitivity\n"
+            "- Identify which crop performs more consistently vs variable\n\n"
+            "4. Field Management Zones\n"
+            "- Identify zones for variable management (fertilizer, irrigation)\n"
+            "- Define rules for high-performing vs low-performing zones\n\n"
+            "5. Actionable Agronomy Insights\n"
+            "- Practical interventions based on thresholds (e.g., soil pH below 5.5 requires lime)\n"
+            "- Crop choice guidance\n\n"
+            "6. Business/Tech Impact\n"
+            "- Insights can power farm decision-support tools\n"
+            "- Suggest monetization (SaaS dashboards, consultancy)\n\n"
+            "7. Concrete Next Steps\n"
+            "- Generate heatmaps, run correlation analysis, define soil thresholds, build dashboard\n\n"
+            "Final output: Complete <html>...</html> report, structured and professional.";
+        prompt += "\n\nHere are the datasets:\n\n" + csvContent;
+        json payload = {{"model", "gemini-2.0-flash-001"}, {"messages", {{{"role", "user"}, {"content", prompt}}}}};
 
         std::string readBuffer;
         CURL* curl = curl_easy_init();
@@ -142,8 +134,7 @@ std::string prompt =
         headers = curl_slist_append(headers, ("Authorization: Bearer " + api_key).c_str());
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
-        curl_easy_setopt(curl, CURLOPT_URL,
-                         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+        curl_easy_setopt(curl, CURLOPT_URL, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
         std::string payloadStr = payload.dump();
@@ -151,7 +142,7 @@ std::string prompt =
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
-        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L); // debug
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);  // debug
 
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
@@ -180,7 +171,7 @@ std::string prompt =
     }
 
     // Load tile/soil data
-    bool updateSoilData(const std::string& filename = "soil_data.csv") {
+    bool updateSoilData(const std::string& filename = "land.csv") {
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Could not open file: " << filename << ": " << strerror(errno) << "\n";
@@ -196,9 +187,9 @@ std::string prompt =
             std::stringstream ss(line);
             std::string token;
             std::vector<float> props;
-            std::cout<<"Line: "<<line<<"\n";
+            std::cout << "Line: " << line << "\n";
             while (std::getline(ss, token, ',')) {
-                std::cout<<"token: "<<token<<"\n";
+                std::cout << "token: " << token << "\n";
 
                 if (!token.empty()) props.push_back(std::stof(token));
             }
@@ -238,9 +229,8 @@ std::string prompt =
         crop_map_.clear();
         std::string line;
         std::getline(file, line);  // skip header
-        
-        while (std::getline(file, line)) {
 
+        while (std::getline(file, line)) {
             if (line.empty()) continue;
             std::stringstream ss(line);
             std::string token;
@@ -253,22 +243,22 @@ std::string prompt =
             if (fields.size() < 6) continue;
 
             CropSimulation sim;
-                
-            try{
+
+            try {
                 sim.x = std::stof(fields[1]);
                 sim.y = std::stof(fields[2]);
                 sim.cropName = fields[3];
-                sim.timeToMature = std::stod(fields[5]);                         
+                sim.timeToMature = std::stod(fields[5]);
 
                 std::size_t key = hashTwoFloats(sim.x, sim.y);
                 auto it = crop_map_.find(key);
                 if (it == crop_map_.end() || sim.timeToMature <= it->second.timeToMature) {
                     crop_map_[key] = sim;
                 }
-            } catch (const std::exception &e) {
+            } catch (const std::exception& e) {
                 std::cerr << "Invalid data in crop simulation: '" << line << "'\n";
                 continue;
-            }   
+            }
         }
 
         std::cout << "Loaded " << crop_map_.size() << " crop simulations.\n";
@@ -284,7 +274,7 @@ std::string prompt =
     }
 
     // Get best crop for a rectangular area
-    std::string getBestCropForArea(Point topLeft, Point bottomRight)  {
+    std::string getBestCropForArea(Point topLeft, Point bottomRight) {
         std::unordered_map<std::string, int> cropCounts;
 
         for (const auto& pair : tile_map_) {
@@ -306,10 +296,10 @@ std::string prompt =
             }
         }
 
-        std::string analysis = analyzeCSVWithLLM("soil_data.csv", "simulation_output.csv", KEY);
-        dumpLLMReport("harvestor_report.html",analysis, bestCrop);
+        std::string analysis = analyzeCSVWithLLM("land.csv", "simulation_output.csv", KEY);
+        dumpLLMReport("harvestor_report.html", analysis, bestCrop);
 
-        fs::path absolutePath = fs::absolute("/harvestor_report.html"); 
+        fs::path absolutePath = fs::absolute("/harvestor_report.html");
         auto command = std::string("start ") + absolutePath.string();
         system(command.c_str());
 

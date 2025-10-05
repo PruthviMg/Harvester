@@ -38,6 +38,7 @@ struct Config {
     static inline float bigButtonHeightMultiplier = 3.f;  // big buttons (simulate/reset/rain)
     static inline float uiPadding = 10.f;
     static inline float ButtonPadding = 300.f;
+    static inline float ButtonInsideSpacing = 6.f;
 
     static inline unsigned int cropFontSize = 16;
     static inline unsigned int bigButtonFontSize = 18;
