@@ -62,7 +62,6 @@ class Land {
                 tomatoTexture.setSmooth(true);
             }
         }
-
     }
 
     void generateTiles(std::vector<Tile> ts) {
@@ -342,21 +341,20 @@ class Land {
 
             rect.setTexture(&farmlandTexture);
             rect.setTextureRect(sf::IntRect(0, 0, static_cast<int>(tile.size), static_cast<int>(tile.size)));
-            
-                
+
             window.draw(rect);
-            if(tile.hasCrop ){    
-                window.draw(tile.crop.shape);}
-                if(tile.crop.growth >= 1.f){                    
-                    if(tile.cropType.name == "Barley")
-                        tile.crop.shape.setTexture(&wheatTexture);
-                    else if(tile.cropType.name == "Tomato")
-                        tile.crop.shape.setTexture(&tomatoTexture);
-                    else if(tile.cropType.name == "Sugarcane")
-                        tile.crop.shape.setTexture(&sugarcaneTexture);
-                }
+            if (tile.hasCrop) {
+                window.draw(tile.crop.shape);
             }
-            
+            if (tile.crop.growth >= 1.f) {
+                if (tile.cropType.name == "Barley")
+                    tile.crop.shape.setTexture(&wheatTexture);
+                else if (tile.cropType.name == "Tomato")
+                    tile.crop.shape.setTexture(&tomatoTexture);
+                else if (tile.cropType.name == "Sugarcane")
+                    tile.crop.shape.setTexture(&sugarcaneTexture);
+            }
+        }
     }
 };
 sf::Texture Land::wheatTexture;

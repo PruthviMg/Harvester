@@ -334,7 +334,7 @@ class FarmScene {
 
             // Percentage text
             sf::Text pctText(std::to_string(int(pct * 100)) + "%", font, 14);
-            
+
             pctText.setPosition(hudX + hudWidth - padding - 40, y + textHeight);
             pctText.setFillColor(sf::Color::White);
             window.draw(pctText);
@@ -581,7 +581,7 @@ class FarmScene {
 
         drawButton(btnX, btnY, "Plant Crops", buttonBaseColor, font, btnWidth, btnHeight);
         drawButton(btnX, btnY, "Clear Results", buttonBaseColor, font, btnWidth, btnHeight);
-        drawButton(btnX, btnY, "Analyse", analysisRequested? sf::Color(0, 255, 0) :  sf::Color(buttonBaseColor), font, btnWidth, btnHeight);
+        drawButton(btnX, btnY, "Analyse", analysisRequested ? sf::Color(0, 255, 0) : sf::Color(buttonBaseColor), font, btnWidth, btnHeight);
     }
 
     // Generic dropdown click handler
@@ -719,7 +719,11 @@ class FarmScene {
             return;
         if (checkButtonClick("Plant Crops", [&]() { plantCropsInSelection(); })) return;
         if (checkButtonClick("Clear Results", [&]() { clearSimulationResults(); })) return;
-        if (checkButtonClick("Analyse", [&]() { analysisRequested = !analysisRequested; analyzeSelectedArea(); })) return;
+        if (checkButtonClick("Analyse", [&]() {
+                analysisRequested = !analysisRequested;
+                analyzeSelectedArea();
+            }))
+            return;
     }
 
     void plantCropsInSelection() {
@@ -849,7 +853,6 @@ class FarmScene {
             popup.setPosition(selectionRect.getPosition().x, selectionRect.getPosition().y - 130.f);  // above selection
             window.draw(popup);
 
-
             // ---------------- Collect tiles inside selection ----------------
             sf::FloatRect selRect = selectionRect.getGlobalBounds();
 
@@ -860,16 +863,16 @@ class FarmScene {
 
                 for (int tileIdx = 0; tileIdx < (int)land.tiles.size(); ++tileIdx) {
                     const auto &tile = land.tiles[tileIdx];
-                    quality += land.computeSoilQuality(tile, tile.cropType);
                     sf::FloatRect tileRect(tile.position, sf::Vector2f(tile.size, tile.size));
-                    
+
                     if (selRect.intersects(tileRect)) {
+                        quality += land.computeSoilQuality(tile, tile.cropType);
                         selectedTiles.emplace_back(landIdx, tileIdx);
                     }
                 }
             }
-            
-            sf::Text text("Soil Average Quality: " + std::to_string(quality), font, 16);
+
+            sf::Text text("Soil Average Quality: " + std::to_string((quality / (selectedTiles.size()))), font, 14);
             text.setFillColor(sf::Color::White);
             text.setPosition(popup.getPosition().x + 10.f, popup.getPosition().y + 10.f);
             window.draw(text);

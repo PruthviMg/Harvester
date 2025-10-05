@@ -5,7 +5,7 @@ import random
 import math
 
 # --- Configuration ---
-input_file = 'map_satellite.jpg'
+input_file = 'maps/map_satellite.jpg'
 output_file = 'map_3color.png'
 land_csv = 'land.csv'
 water_csv = 'water.csv'
@@ -69,7 +69,6 @@ with open(land_csv, 'w', newline='') as lf, open(water_csv, 'w', newline='') as 
         for x in range(small_w):
             b,g,r = terrain_img[y,x]
             if (b,g,r) == (255,0,0):  # WATER
-                print("water")
                 water_writer.writerow([x,y])
             elif (b,g,r) == (0,255,0):  # LAND
                 land_writer.writerow([
