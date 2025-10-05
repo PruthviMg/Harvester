@@ -19,8 +19,31 @@ using json = nlohmann::json;
 namespace Harvestor {
 constexpr auto KEY = "AIzaSyCQqddg4pZQYSav7av5G4jBE8ZRYUcxLMs";
 class Evaluator {
+    std::string KEY{};
+
    public:
-    Evaluator(float precision = 0.001f) : precision_(precision) {}
+    Evaluator(float precision = 0.001f) : precision_(precision) {
+        std::ifstream configFile("input/config.json");
+        if (!configFile.is_open()) {
+            std::cerr << "Failed to open config.json\n";
+            return;
+        }
+
+        nlohmann::json configJson;
+        try {
+            configFile >> configJson;  // Parse JSON
+        } catch (const std::exception& e) {
+            std::cerr << "Error parsing JSON: " << e.what() << "\n";
+            return;
+        }
+
+        if (configJson.contains("API_KEY") && configJson["API_KEY"].is_string()) {
+            KEY = configJson["API_KEY"];
+        } else {
+            std::cerr << "API_KEY not found or not a string\n";
+            return;
+        }
+    }
     // Gemini LLM CSV analysis
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
         ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -188,10 +211,7 @@ class Evaluator {
             std::stringstream ss(line);
             std::string token;
             std::vector<float> props;
-            std::cout << "Line: " << line << "\n";
             while (std::getline(ss, token, ',')) {
-                std::cout << "token: " << token << "\n";
-
                 if (!token.empty()) props.push_back(std::stof(token));
             }
 
