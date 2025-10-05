@@ -56,4 +56,5 @@ file(COPY layouts/ DESTINATION ${CMAKE_BINARY_DIR}/layouts/)
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/resources)
 file(COPY report/land.csv DESTINATION ${CMAKE_BINARY_DIR}/input/)
 file(COPY report/water.csv DESTINATION ${CMAKE_BINARY_DIR}/input/)
+file(COPY report/ DESTINATION ${CMAKE_BINARY_DIR}/)
 

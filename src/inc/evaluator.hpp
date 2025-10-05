@@ -50,6 +50,7 @@ class Evaluator {
         file << "</body>\n</html>\n";
 
         std::cout << "Report written to " << report_filename << std::endl;
+        int ret = std::system("python3 ./report/dashboard.py");
     }
 
     std::string analyzeCSVWithLLM(const std::string& filename, const std::string& filename2, const std::string& api_key) {
